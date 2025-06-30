@@ -19,9 +19,9 @@ defmodule Mixpanel.API.EventsTest do
     end
   end
 
-  describe "track_batch/1" do
+  describe "track_many/1" do
     test "returns error for empty batch" do
-      result = Mixpanel.API.Events.track_batch([])
+      result = Mixpanel.API.Events.track_many([])
 
       assert {:error, "batch cannot be empty"} = result
     end
@@ -29,13 +29,11 @@ defmodule Mixpanel.API.EventsTest do
     test "returns error for batch that is too large" do
       large_batch = for i <- 1..2001, do: %{event: "test", device_id: "device-uuid-#{i}"}
 
-      result = Mixpanel.API.Events.track_batch(large_batch)
+      result = Mixpanel.API.Events.track_many(large_batch)
 
       assert {:error, "batch size exceeds maximum of 2000 events"} = result
     end
-  end
 
-  describe "import/1" do
     test "returns error when service account is not configured" do
       Application.delete_env(:mixpanel, :service_account)
 
@@ -43,15 +41,6 @@ defmodule Mixpanel.API.EventsTest do
       result = Mixpanel.API.Events.track_many(events)
 
       assert {:error, "service account not configured for import API"} = result
-    end
-
-    test "returns error for empty batch" do
-      service_account = %{username: "user", password: "pass", project_id: "123"}
-      Application.put_env(:mixpanel, :service_account, service_account)
-
-      result = Mixpanel.API.Events.track_many([])
-
-      assert {:error, "batch cannot be empty"} = result
     end
   end
 end
