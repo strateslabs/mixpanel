@@ -173,6 +173,21 @@ defmodule Mixpanel do
     Mixpanel.Batcher.flush()
   end
 
+  @doc """
+  Clear all pending batched events without sending them.
+
+  This is primarily intended for test cleanup to avoid sending events
+  during teardown when stubs may no longer be available.
+
+  ## Returns
+
+    * `:ok` - Events cleared successfully
+  """
+  @spec clear() :: :ok
+  def clear do
+    Mixpanel.Batcher.clear()
+  end
+
   # Private validation functions
 
   defp validate_track_inputs("", _properties) do

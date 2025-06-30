@@ -29,6 +29,11 @@ defmodule Mixpanel.Batcher do
     GenServer.call(__MODULE__, :flush)
   end
 
+  @spec clear() :: :ok
+  def clear do
+    GenServer.call(__MODULE__, :clear)
+  end
+
 
   # GenServer callbacks
 
@@ -70,6 +75,12 @@ defmodule Mixpanel.Batcher do
       send_batch_sync(state.events)
     end
 
+    state = reset_batch_state(state)
+    {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_call(:clear, _from, state) do
     state = reset_batch_state(state)
     {:reply, :ok, state}
   end
