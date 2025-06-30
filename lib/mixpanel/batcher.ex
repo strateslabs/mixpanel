@@ -34,7 +34,6 @@ defmodule Mixpanel.Batcher do
     GenServer.call(__MODULE__, :clear)
   end
 
-
   # GenServer callbacks
 
   @impl GenServer
@@ -67,7 +66,6 @@ defmodule Mixpanel.Batcher do
       {:noreply, state}
     end
   end
-
 
   @impl GenServer
   def handle_call(:flush, _from, state) do
@@ -138,7 +136,6 @@ defmodule Mixpanel.Batcher do
     length(events) >= Config.batch_size()
   end
 
-
   defp ensure_timer_running(%{timer_ref: nil} = state) do
     timer_ref = Process.send_after(self(), :batch_timeout, Config.batch_timeout())
     %{state | timer_ref: timer_ref}
@@ -174,5 +171,4 @@ defmodule Mixpanel.Batcher do
         Logger.error("Batch send failed: #{inspect(error)}")
     end
   end
-
 end

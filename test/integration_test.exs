@@ -27,6 +27,9 @@ defmodule Mixpanel.IntegrationTest do
     stub_with_default_success()
 
     on_exit(fn ->
+      # Flush batcher and wait for any pending async tasks
+      flush_and_wait()
+
       Application.delete_env(:mixpanel, :project_token)
       Application.delete_env(:mixpanel, :service_account)
       Application.delete_env(:mixpanel, :batch_size)
@@ -51,6 +54,11 @@ defmodule Mixpanel.IntegrationTest do
       nil -> :ignore
       pid -> Req.Test.allow(__MODULE__, self(), pid)
     end
+  end
+
+  defp flush_and_wait do
+    # Clear pending events without sending them to avoid stub access issues
+    Mixpanel.clear()
   end
 
   describe "track/2 happy paths" do

@@ -147,7 +147,6 @@ defmodule Mixpanel do
     {:error, "events must be a list"}
   end
 
-
   @doc """
   Flush all pending batched events immediately.
 
