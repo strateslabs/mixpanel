@@ -157,13 +157,13 @@ defmodule Mixpanel.Batcher do
 
   defp send_batch_async(events) do
     Task.start(fn ->
-      result = API.Events.track_many(events)
+      result = API.Events.track_many(events, emit_telemetry: false)
       send(__MODULE__, {:batch_result, result})
     end)
   end
 
   defp send_batch_sync(events) do
-    case API.Events.track_many(events) do
+    case API.Events.track_many(events, emit_telemetry: false) do
       {:ok, _response} ->
         Logger.debug("Batch sent successfully")
 

@@ -217,15 +217,12 @@ Track a single event immediately or add to batch.
 Track multiple historical events with timestamps in batch. Requires service account configuration.
 
 **Parameters:**
-- `events` (List) - List of event maps with `:event`, `:device_id`, `:time`
+- `events` (List) - List of event maps with `:event`, `:device_id`, and optional `:time`
 
 **Returns:**
 - `{:ok, %{"accepted" => count}}` - Success
 - `{:error, reason}` - Error
 
-### `Mixpanel.import_events/1` (DEPRECATED)
-
-**DEPRECATED**: Use `track_many/1` instead. This function will be removed in v1.0.
 
 ### `Mixpanel.flush/0`
 
@@ -268,17 +265,20 @@ The library includes comprehensive telemetry events for monitoring:
 end)
 
 # Available telemetry events:
-# [:mixpanel, :track, :success] - Single event tracked successfully
-# [:mixpanel, :track, :error] - Single event tracking failed
+# Track events (individual events)
+# [:mixpanel, :track, :success] - Single event tracked successfully (immediate mode)
+# [:mixpanel, :track, :error] - Single event tracking failed (immediate mode)
 # [:mixpanel, :track, :validation_error] - Event validation failed
-# [:mixpanel, :track, :batch_queued] - Event added to batch
-# [:mixpanel, :track_batch, :success] - Batch sent successfully  
-# [:mixpanel, :track_batch, :error] - Batch sending failed
-# [:mixpanel, :import, :success] - Historical events imported
-# [:mixpanel, :import, :error] - Import failed
-# [:mixpanel, :batch, :full] - Batch reached size limit
+# [:mixpanel, :track, :batch_queued] - Event added to batch (default mode)
+
+# Import events (historical data)
+# [:mixpanel, :import, :success] - Historical events imported successfully
+# [:mixpanel, :import, :error] - Historical events import failed
+
+# Batch events (batching lifecycle)
 # [:mixpanel, :batch, :queued] - Events queued in batch
-# [:mixpanel, :batch, :sent] - Batch sent to API
+# [:mixpanel, :batch, :full] - Batch reached size limit and was sent
+# [:mixpanel, :batch, :sent] - Batch sent successfully to API
 # [:mixpanel, :batch, :failed] - Batch sending failed
 # [:mixpanel, :batch, :rate_limited] - Rate limit encountered
 ```

@@ -16,26 +16,24 @@
 
 # Example 1: Track a single event immediately
 {:ok, result} = Mixpanel.track("button_clicked", %{
-  distinct_id: "user123",
-  properties: %{
-    button_id: "submit",
-    page: "checkout",
-    timestamp: DateTime.utc_now()
-  }
-})
+  device_id: "user123",
+  button_id: "submit",
+  page: "checkout",
+  timestamp: DateTime.utc_now()
+}, immediate: true)
 
 IO.puts("Event tracked: #{inspect(result)}")
 
-# Example 2: Track events using batching for high throughput
+# Example 2: Track events using batching for high throughput (default behavior)
 Mixpanel.track("page_view", %{
-  distinct_id: "user123",
-  properties: %{page: "home"}
-}, batch: true)
+  device_id: "user123",
+  page: "home"
+})
 
 Mixpanel.track("page_view", %{
-  distinct_id: "user456", 
-  properties: %{page: "about"}
-}, batch: true)
+  device_id: "user456", 
+  page: "about"
+})
 
 # Flush batched events
 Mixpanel.flush()
@@ -45,26 +43,22 @@ IO.puts("Batched events flushed")
 historical_events = [
   %{
     event: "signup",
-    distinct_id: "user123",
+    device_id: "user123",
     time: ~U[2023-01-01 00:00:00Z],
-    properties: %{
-      source: "organic",
-      email: "user@example.com"
-    }
+    source: "organic",
+    email: "user@example.com"
   },
   %{
     event: "first_purchase",
-    distinct_id: "user123", 
+    device_id: "user123", 
     time: ~U[2023-01-02 12:30:00Z],
-    properties: %{
-      amount: 99.99,
-      currency: "USD",
-      product: "premium_plan"
-    }
+    amount: 99.99,
+    currency: "USD",
+    product: "premium_plan"
   }
 ]
 
-case Mixpanel.import_events(historical_events) do
+case Mixpanel.track_many(historical_events) do
   {:ok, result} ->
     IO.puts("Import successful: #{inspect(result)}")
   {:error, reason} ->
@@ -72,7 +66,7 @@ case Mixpanel.import_events(historical_events) do
 end
 
 # Example 4: Error handling
-case Mixpanel.track("", %{distinct_id: "user123"}) do
+case Mixpanel.track("", %{device_id: "user123"}, immediate: true) do
   {:ok, result} ->
     IO.puts("Success: #{inspect(result)}")
   {:error, reason} ->

@@ -68,8 +68,14 @@ defmodule Mixpanel.API.Events do
 
   @spec track_many([map()]) :: response()
   def track_many(events) do
+    track_many(events, emit_telemetry: true)
+  end
+
+  @spec track_many([map()], keyword()) :: response()
+  def track_many(events, opts) do
     start_time = System.monotonic_time()
     event_count = length(events)
+    emit_telemetry = Keyword.get(opts, :emit_telemetry, true)
 
     result =
       with {:ok, validated_events} <- validate_import_batch(events) do
@@ -83,23 +89,23 @@ defmodule Mixpanel.API.Events do
         end
       end
 
-    case result do
-      {:ok, response} ->
-        emit_telemetry_event(:import, :success, start_time, %{
-          event_count: event_count,
-          response: response
-        })
+    if emit_telemetry do
+      case result do
+        {:ok, response} ->
+          emit_telemetry_event(:import, :success, start_time, %{
+            event_count: event_count,
+            response: response
+          })
 
-        result
-
-      {:error, reason} ->
-        emit_telemetry_event(:import, :error, start_time, %{
-          event_count: event_count,
-          error: reason
-        })
-
-        result
+        {:error, reason} ->
+          emit_telemetry_event(:import, :error, start_time, %{
+            event_count: event_count,
+            error: reason
+          })
+      end
     end
+
+    result
   end
 
   defp create_and_validate_event(event_name, event_data) do
