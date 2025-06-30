@@ -124,7 +124,7 @@ defmodule Mixpanel.IntegrationTest do
     end
   end
 
-  describe "import_events/1 happy paths" do
+  describe "track_many/1 happy paths" do
     test "successfully imports a batch of historical events" do
       Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
         assert conn.request_path == "/import"
@@ -155,7 +155,7 @@ defmodule Mixpanel.IntegrationTest do
         }
       ]
 
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
       assert {:ok, %{accepted: 2}} = result
     end
 
@@ -173,7 +173,7 @@ defmodule Mixpanel.IntegrationTest do
         }
       ]
 
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
       assert {:ok, %{accepted: 1}} = result
     end
   end
@@ -279,7 +279,7 @@ defmodule Mixpanel.IntegrationTest do
       end)
 
       result =
-        Mixpanel.import_events([
+        Mixpanel.track_many([
           %{event: "test", device_id: "device-uuid-123"}
         ])
 

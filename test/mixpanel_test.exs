@@ -136,9 +136,9 @@ defmodule MixpanelTest do
     end
   end
 
-  describe "import_events/1 validation" do
+  describe "track_many/1 validation" do
     test "returns error for empty list" do
-      result = Mixpanel.import_events([])
+      result = Mixpanel.track_many([])
 
       assert {:error, "batch cannot be empty"} = result
     end
@@ -150,19 +150,19 @@ defmodule MixpanelTest do
         %{device_id: "device-uuid-456"}
       ]
 
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
 
       assert {:error, "all events must have :event and :device_id fields"} = result
     end
 
     test "returns error for non-list input" do
-      result = Mixpanel.import_events("not_a_list")
+      result = Mixpanel.track_many("not_a_list")
 
       assert {:error, "events must be a list"} = result
     end
   end
 
-  describe "import_events/1 happy paths" do
+  describe "track_many/1 happy paths" do
     test "successfully validates and calls API for import" do
       Application.put_env(:mixpanel, :service_account, %{
         username: "test_user",
@@ -179,7 +179,7 @@ defmodule MixpanelTest do
         %{event: "purchase", device_id: "device-uuid-123", user_id: "user123", amount: 49.99}
       ]
 
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
 
       assert {:ok, %{accepted: 2}} = result
     end
@@ -196,7 +196,7 @@ defmodule MixpanelTest do
       end)
 
       events = [%{event: "test", device_id: "device-uuid-123"}]
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -205,7 +205,7 @@ defmodule MixpanelTest do
       Application.delete_env(:mixpanel, :service_account)
 
       events = [%{event: "test", device_id: "device-uuid-123"}]
-      result = Mixpanel.import_events(events)
+      result = Mixpanel.track_many(events)
 
       assert {:error, "service account not configured for import API"} = result
     end

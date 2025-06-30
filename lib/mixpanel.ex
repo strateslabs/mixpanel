@@ -147,16 +147,6 @@ defmodule Mixpanel do
     {:error, "events must be a list"}
   end
 
-  @doc """
-  Import a batch of historical events.
-
-  **DEPRECATED**: Use `track_many/1` instead. This function will be removed in v1.0.
-
-  This function exists for backward compatibility and delegates to `track_many/1`.
-  """
-  @deprecated "Use track_many/1 instead"
-  @spec import_events([map()]) :: response()
-  def import_events(events), do: track_many(events)
 
   @doc """
   Flush all pending batched events immediately.
