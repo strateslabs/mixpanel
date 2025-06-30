@@ -14,15 +14,19 @@ defmodule Mixpanel.Config do
           service_account: service_account() | nil,
           batch_size: pos_integer(),
           batch_timeout: pos_integer(),
-          max_retries: non_neg_integer(),
-          base_url: String.t()
+          base_url: String.t(),
+          http_client_options: keyword()
         }
 
   @default_config %{
     batch_size: 1000,
     batch_timeout: 5000,
-    max_retries: 3,
-    base_url: "https://api.mixpanel.com"
+    base_url: "https://api.mixpanel.com",
+    http_client_options: [
+      retry: :transient,
+      max_retries: 3,
+      retry_log_level: :debug
+    ]
   }
 
   @spec get() :: config()
@@ -59,14 +63,14 @@ defmodule Mixpanel.Config do
     Application.get_env(:mixpanel, :batch_timeout, @default_config.batch_timeout)
   end
 
-  @spec max_retries() :: non_neg_integer()
-  def max_retries do
-    Application.get_env(:mixpanel, :max_retries, @default_config.max_retries)
-  end
-
   @spec base_url() :: String.t()
   def base_url do
     Application.get_env(:mixpanel, :base_url, @default_config.base_url)
+  end
+
+  @spec http_client_options() :: keyword()
+  def http_client_options do
+    Application.get_env(:mixpanel, :http_client_options, @default_config.http_client_options)
   end
 
   defp validate_config!(config) do
@@ -93,8 +97,8 @@ defmodule Mixpanel.Config do
       raise ArgumentError, "batch_timeout must be a positive integer"
     end
 
-    unless is_integer(config.max_retries) and config.max_retries >= 0 do
-      raise ArgumentError, "max_retries must be a non-negative integer"
+    unless is_list(config.http_client_options) do
+      raise ArgumentError, "http_client_options must be a keyword list"
     end
 
     config

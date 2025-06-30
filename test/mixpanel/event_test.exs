@@ -20,10 +20,10 @@ defmodule Mixpanel.EventTest do
         })
 
       assert event.properties == %{
-        device_id: "device-uuid-123",
-        button_id: "submit",
-        page: "checkout"
-      }
+               device_id: "device-uuid-123",
+               button_id: "submit",
+               page: "checkout"
+             }
     end
 
     test "creates track event with custom time" do
@@ -47,10 +47,10 @@ defmodule Mixpanel.EventTest do
         })
 
       assert event.properties == %{
-        device_id: "device-uuid-123",
-        user_id: "user@example.com",
-        method: "password"
-      }
+               device_id: "device-uuid-123",
+               user_id: "user@example.com",
+               method: "password"
+             }
     end
 
     test "creates track event with ip for geolocation" do
@@ -63,11 +63,11 @@ defmodule Mixpanel.EventTest do
         })
 
       assert event.properties == %{
-        device_id: "device-uuid-123",
-        user_id: "user@example.com",
-        ip: "192.168.1.1",
-        page: "home"
-      }
+               device_id: "device-uuid-123",
+               user_id: "user@example.com",
+               ip: "192.168.1.1",
+               page: "home"
+             }
     end
 
     test "raises when event name is missing" do
@@ -96,10 +96,11 @@ defmodule Mixpanel.EventTest do
 
       assert event.event == "signup"
       assert event.time == 1_234_567_890
+
       assert event.properties == %{
-        device_id: "device-uuid-123",
-        source: "organic"
-      }
+               device_id: "device-uuid-123",
+               source: "organic"
+             }
     end
 
     test "uses current time when time is not provided" do
@@ -165,7 +166,8 @@ defmodule Mixpanel.EventTest do
     end
 
     test "rejects event with too many properties" do
-      properties = for i <- 1..256, into: %{device_id: "device-uuid-123"}, do: {"prop_#{i}", "value"}
+      properties =
+        for i <- 1..256, into: %{device_id: "device-uuid-123"}, do: {"prop_#{i}", "value"}
 
       event = %Mixpanel.Event{
         event: "test_event",

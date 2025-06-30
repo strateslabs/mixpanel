@@ -1,5 +1,4 @@
-Mox.defmock(Mixpanel.HTTPClientMock, for: Mixpanel.HTTPClientBehaviour)
-Mox.defmock(Mixpanel.API.EventsMock, for: Mixpanel.API.EventsBehaviour)
-Mox.defmock(Mixpanel.BatcherMock, for: Mixpanel.BatcherBehaviour)
+# Load test support files
+Code.require_file("support/test_http_client.ex", __DIR__)
 
 ExUnit.start()

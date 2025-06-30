@@ -7,8 +7,8 @@ defmodule Mixpanel.ConfigTest do
     Application.delete_env(:mixpanel, :service_account)
     Application.delete_env(:mixpanel, :batch_size)
     Application.delete_env(:mixpanel, :batch_timeout)
-    Application.delete_env(:mixpanel, :max_retries)
     Application.delete_env(:mixpanel, :base_url)
+    Application.delete_env(:mixpanel, :http_client_options)
     :ok
   end
 
@@ -22,23 +22,28 @@ defmodule Mixpanel.ConfigTest do
       assert config.service_account == nil
       assert config.batch_size == 1000
       assert config.batch_timeout == 5000
-      assert config.max_retries == 3
       assert config.base_url == "https://api.mixpanel.com"
+
+      assert config.http_client_options == [
+               retry: :transient,
+               max_retries: 3,
+               retry_log_level: :debug
+             ]
     end
 
     test "returns config with custom values when set" do
       Application.put_env(:mixpanel, :project_token, "test_token")
       Application.put_env(:mixpanel, :batch_size, 500)
       Application.put_env(:mixpanel, :batch_timeout, 2000)
-      Application.put_env(:mixpanel, :max_retries, 5)
       Application.put_env(:mixpanel, :base_url, "https://eu.mixpanel.com")
+      Application.put_env(:mixpanel, :http_client_options, timeout: 30_000)
 
       config = Mixpanel.Config.get()
 
       assert config.batch_size == 500
       assert config.batch_timeout == 2000
-      assert config.max_retries == 5
       assert config.base_url == "https://eu.mixpanel.com"
+      assert config.http_client_options == [timeout: 30_000]
     end
 
     test "includes service_account when configured" do
@@ -87,6 +92,15 @@ defmodule Mixpanel.ConfigTest do
       Application.put_env(:mixpanel, :batch_size, 0)
 
       assert_raise ArgumentError, "batch_size must be a positive integer", fn ->
+        Mixpanel.Config.get()
+      end
+    end
+
+    test "raises when http_client_options is not a list" do
+      Application.put_env(:mixpanel, :project_token, "test_token")
+      Application.put_env(:mixpanel, :http_client_options, "not_a_list")
+
+      assert_raise ArgumentError, "http_client_options must be a keyword list", fn ->
         Mixpanel.Config.get()
       end
     end
@@ -148,18 +162,6 @@ defmodule Mixpanel.ConfigTest do
     end
   end
 
-  describe "max_retries/0" do
-    test "returns default when not configured" do
-      assert Mixpanel.Config.max_retries() == 3
-    end
-
-    test "returns configured value" do
-      Application.put_env(:mixpanel, :max_retries, 5)
-
-      assert Mixpanel.Config.max_retries() == 5
-    end
-  end
-
   describe "base_url/0" do
     test "returns default when not configured" do
       assert Mixpanel.Config.base_url() == "https://api.mixpanel.com"
@@ -169,6 +171,29 @@ defmodule Mixpanel.ConfigTest do
       Application.put_env(:mixpanel, :base_url, "https://eu.mixpanel.com")
 
       assert Mixpanel.Config.base_url() == "https://eu.mixpanel.com"
+    end
+  end
+
+  describe "http_client_options/0" do
+    test "returns default retry options when not configured" do
+      assert Mixpanel.Config.http_client_options() == [
+               retry: :transient,
+               max_retries: 3,
+               retry_log_level: :debug
+             ]
+    end
+
+    test "returns configured options when set" do
+      custom_options = [
+        receive_timeout: 30_000,
+        decode_body: false,
+        max_retries: 5,
+        retry_log_level: :info
+      ]
+
+      Application.put_env(:mixpanel, :http_client_options, custom_options)
+
+      assert Mixpanel.Config.http_client_options() == custom_options
     end
   end
 end

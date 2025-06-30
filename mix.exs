@@ -33,7 +33,7 @@ defmodule Mixpanel.MixProject do
       {:jason, "~> 1.4"},
       {:req, "~> 0.5.0"},
       {:telemetry, "~> 1.0"},
-      {:mox, "~> 1.2.0", only: :test},
+      {:plug, "~> 1.15", only: :test},
       {:styler, "~> 1.1", only: [:dev, :test]}
     ]
   end

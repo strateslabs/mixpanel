@@ -1,30 +1,30 @@
 defmodule MixpanelTest do
   use ExUnit.Case
-  import Mox
   doctest Mixpanel
-
-  setup :verify_on_exit!
 
   setup do
     Application.put_env(:mixpanel, :project_token, "test_token")
-    Application.put_env(:mixpanel, :http_client, Mixpanel.HTTPClientMock)
-
-    # Enable global mode for this process and all child processes
-    Mox.set_mox_global()
+    Application.put_env(:mixpanel, :http_client, Mixpanel.TestHTTPClient)
 
     # Default stub for any unexpected calls to HTTP client (like from batcher)
-    stub(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-      {:ok, %{status: 200, body: %{"status" => 1}}}
+    Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.json(conn, %{"status" => 1})
     end)
 
     on_exit(fn ->
       Application.delete_env(:mixpanel, :project_token)
       Application.delete_env(:mixpanel, :http_client)
-      # Reset to private mode
-      Mox.set_mox_private()
     end)
 
     :ok
+  end
+
+  defp allow_batcher_access do
+    # Allow all processes to use the stub (needed for Batcher process)
+    case Process.whereis(Mixpanel.Batcher) do
+      nil -> :ignore
+      pid -> Req.Test.allow(Mixpanel.TestHTTPClient, self(), pid)
+    end
   end
 
   describe "track/2 validation" do
@@ -44,15 +44,19 @@ defmodule MixpanelTest do
   describe "track/2 happy paths" do
     test "successfully validates and calls API for immediate tracking" do
       # Mock successful HTTP response
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"status" => 1}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"status" => 1})
       end)
 
       result =
-        Mixpanel.track("purchase", %{
-          device_id: "device-uuid-123",
-          amount: 99.99
-        }, immediate: true)
+        Mixpanel.track(
+          "purchase",
+          %{
+            device_id: "device-uuid-123",
+            amount: 99.99
+          },
+          immediate: true
+        )
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -72,49 +76,61 @@ defmodule MixpanelTest do
     end
 
     test "handles valid event with custom timestamp" do
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"status" => 1}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"status" => 1})
       end)
 
       custom_time = ~U[2023-01-01 00:00:00Z]
 
       result =
-        Mixpanel.track("signup", %{
-          device_id: "device-uuid-123",
-          time: custom_time,
-          source: "organic"
-        }, immediate: true)
+        Mixpanel.track(
+          "signup",
+          %{
+            device_id: "device-uuid-123",
+            time: custom_time,
+            source: "organic"
+          },
+          immediate: true
+        )
 
       assert {:ok, %{accepted: 1}} = result
     end
 
     test "handles event with user_id for identified user" do
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"status" => 1}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"status" => 1})
       end)
 
       result =
-        Mixpanel.track("login", %{
-          device_id: "device-uuid-123",
-          user_id: "user@example.com",
-          method: "password"
-        }, immediate: true)
+        Mixpanel.track(
+          "login",
+          %{
+            device_id: "device-uuid-123",
+            user_id: "user@example.com",
+            method: "password"
+          },
+          immediate: true
+        )
 
       assert {:ok, %{accepted: 1}} = result
     end
 
     test "handles event with ip for geolocation" do
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"status" => 1}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"status" => 1})
       end)
 
       result =
-        Mixpanel.track("page_view", %{
-          device_id: "device-uuid-123",
-          user_id: "user@example.com", 
-          ip: "192.168.1.1",
-          page: "home"
-        }, immediate: true)
+        Mixpanel.track(
+          "page_view",
+          %{
+            device_id: "device-uuid-123",
+            user_id: "user@example.com",
+            ip: "192.168.1.1",
+            page: "home"
+          },
+          immediate: true
+        )
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -154,8 +170,8 @@ defmodule MixpanelTest do
         project_id: "123456"
       })
 
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"num_records_imported" => 2}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"num_records_imported" => 2})
       end)
 
       events = [
@@ -175,8 +191,8 @@ defmodule MixpanelTest do
         project_id: "123456"
       })
 
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 200, body: %{"num_records_imported" => 1}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.json(conn, %{"num_records_imported" => 1})
       end)
 
       events = [%{event: "test", device_id: "device-uuid-123"}]
@@ -197,6 +213,9 @@ defmodule MixpanelTest do
 
   describe "flush/0" do
     test "returns ok and flushes batcher" do
+      # Ensure the batcher can use our stub
+      allow_batcher_access()
+
       result = Mixpanel.flush()
 
       assert :ok = result
@@ -205,9 +224,11 @@ defmodule MixpanelTest do
 
   describe "API error propagation" do
     test "propagates rate limit errors from API" do
-      # Mock single call - Req handles retries internally
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 429, body: "Rate limited"}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        conn
+        |> Plug.Conn.put_status(429)
+        |> Plug.Conn.put_resp_content_type("text/plain")
+        |> Plug.Conn.resp(429, "Rate limited")
       end)
 
       result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)
@@ -218,8 +239,10 @@ defmodule MixpanelTest do
     end
 
     test "propagates validation errors from API" do
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:ok, %{status: 400, body: %{"error" => "Invalid data"}}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        conn
+        |> Plug.Conn.put_status(400)
+        |> Req.Test.json(%{"error" => "Invalid data"})
       end)
 
       result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)
@@ -230,9 +253,8 @@ defmodule MixpanelTest do
     end
 
     test "propagates network errors from client" do
-      # Mock single call - Req handles retries internally  
-      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
-        {:error, %{reason: :timeout}}
+      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+        Req.Test.transport_error(conn, :timeout)
       end)
 
       result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)

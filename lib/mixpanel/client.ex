@@ -41,19 +41,20 @@ defmodule Mixpanel.Client do
     make_request(url, events_with_auth, headers)
   end
 
-
   defp make_request(url, payload, headers) do
     http_client = Application.get_env(:mixpanel, :http_client, Req)
-    max_retries = Config.max_retries()
+    user_options = Config.http_client_options()
 
-    # Use Req's built-in retry for transient errors (429, 5xx, network issues)
-    case http_client.post(url, 
-      json: payload, 
-      headers: headers,
-      retry: :transient,
-      max_retries: max_retries,
-      retry_log_level: :debug
-    ) do
+    # Build default options that can be overridden by user config
+    default_options = [
+      json: payload,
+      headers: headers
+    ]
+
+    # Merge user options, allowing them to override defaults
+    final_options = Keyword.merge(default_options, user_options)
+
+    case http_client.post(url, final_options) do
       {:ok, %{status: 200, body: body}} ->
         parse_success_response(body)
 

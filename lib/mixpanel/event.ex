@@ -38,12 +38,12 @@ defmodule Mixpanel.Event do
   def new(%{event: event_name} = event_data) when is_binary(event_name) and event_name != "" do
     # Separate event name from the rest of the properties
     properties = Map.delete(event_data, :event)
-    
+
     # Check for required device_id
     unless Map.has_key?(properties, :device_id) do
       raise ArgumentError, "device_id is required"
     end
-    
+
     time = normalize_time(Map.get(properties, :time, current_timestamp()))
     # Remove time from properties since it's stored separately
     final_properties = Map.delete(properties, :time)
@@ -161,7 +161,9 @@ defmodule Mixpanel.Event do
 
   defp convert_property(properties, from_key, to_key) do
     case Map.get(properties, from_key) do
-      nil -> properties
+      nil ->
+        properties
+
       value ->
         properties
         |> Map.delete(from_key)
