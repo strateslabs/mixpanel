@@ -32,7 +32,7 @@ defmodule Mixpanel.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4"},
       {:req, "~> 0.5.0"},
-      {:mock, "~> 0.3.1", only: :test},
+      {:mox, "~> 1.2.0", only: :test},
       {:styler, "~> 1.1", only: [:dev, :test]}
     ]
   end

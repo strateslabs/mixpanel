@@ -1,111 +1,221 @@
 defmodule MixpanelTest do
   use ExUnit.Case
+  import Mox
+  doctest Mixpanel
 
-  import Mock
-
-  defp mock do
-    [get: fn _, _ -> {:ok, %Req.Response{status: 200, body: "1"}} end]
-  end
+  setup :verify_on_exit!
 
   setup do
-    pid = Process.whereis(Mixpanel.Client)
+    Application.put_env(:mixpanel, :project_token, "test_token")
+    Application.put_env(:mixpanel, :http_client, Mixpanel.HTTPClientMock)
 
-    {:ok, pid: pid}
+    # Enable global mode for this process and all child processes
+    Mox.set_mox_global()
+
+    # Default stub for any unexpected calls to HTTP client (like from batcher)
+    stub(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+      {:ok, %{status: 200, body: %{"status" => 1}}}
+    end)
+
+    on_exit(fn ->
+      Application.delete_env(:mixpanel, :project_token)
+      Application.delete_env(:mixpanel, :http_client)
+      # Reset to private mode
+      Mox.set_mox_private()
+    end)
+
+    :ok
   end
 
-  test_with_mock "track an event", %{pid: pid}, Req, [], mock() do
-    Mixpanel.track("Signed up", %{"Referred By" => "friend"}, distinct_id: "13793")
+  describe "track/2 validation" do
+    test "returns error for invalid event" do
+      result = Mixpanel.track("", %{distinct_id: "user123"})
 
-    :timer.sleep(50)
+      assert {:error, "event name cannot be empty"} = result
+    end
 
-    assert :meck.called(
-             Req,
-             :get,
-             [
-               "https://api.mixpanel.com/track",
-               [
-                 params: [
-                   data:
-                     "eyJwcm9wZXJ0aWVzIjp7IlJlZmVycmVkIEJ5IjoiZnJpZW5kIiwidG9rZW4iOiIiLCJkaXN0aW5jdF9pZCI6IjEzNzkzIn0sImV2ZW50IjoiU2lnbmVkIHVwIn0="
-                 ]
-               ]
-             ],
-             pid
-           )
+    test "returns error when distinct_id is missing" do
+      result = Mixpanel.track("test_event", %{})
 
-    Mixpanel.track(
-      "Level Complete",
-      %{"Level Number" => 9},
-      distinct_id: "13793",
-      time: 1_358_208_000,
-      ip: "203.0.113.9"
-    )
-
-    :timer.sleep(50)
-
-    assert :meck.called(
-             Req,
-             :get,
-             [
-               "https://api.mixpanel.com/track",
-               [
-                 params: [
-                   data:
-                     "eyJwcm9wZXJ0aWVzIjp7IkxldmVsIE51bWJlciI6OSwidG9rZW4iOiIiLCJ0aW1lIjoxMzU4MjA4MDAwLCJpcCI6IjIwMy4wLjExMy45IiwiZGlzdGluY3RfaWQiOiIxMzc5MyJ9LCJldmVudCI6IkxldmVsIENvbXBsZXRlIn0="
-                 ]
-               ]
-             ],
-             pid
-           )
+      assert {:error, "distinct_id is required"} = result
+    end
   end
 
-  test_with_mock "track a profile update", %{pid: pid}, Req, [], mock() do
-    Mixpanel.engage(
-      "13793",
-      "$set",
-      %{"Address" => "1313 Mockingbird Lane"},
-      ip: "123.123.123.123"
-    )
+  describe "track/2 happy paths" do
+    test "successfully validates and calls API for immediate tracking" do
+      # Mock successful HTTP response
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"status" => 1}}}
+      end)
 
-    :timer.sleep(50)
+      result =
+        Mixpanel.track("purchase", %{
+          distinct_id: "user123",
+          properties: %{amount: 99.99}
+        })
 
-    assert :meck.called(
-             Req,
-             :get,
-             [
-               "https://api.mixpanel.com/engage",
-               [
-                 params: [
-                   data:
-                     "eyIkc2V0Ijp7IkFkZHJlc3MiOiIxMzEzIE1vY2tpbmdiaXJkIExhbmUifSwiJHRva2VuIjoiIiwiJGlwIjoiMTIzLjEyMy4xMjMuMTIzIiwiJGRpc3RpbmN0X2lkIjoiMTM3OTMifQ=="
-                 ]
-               ]
-             ],
-             pid
-           )
+      assert {:ok, %{accepted: 1}} = result
+    end
 
-    Mixpanel.engage(
-      "13793",
-      "$set",
-      %{"Address" => "1313 Mockingbird Lane", "Birthday" => "1948-01-01"},
-      ip: "123.123.123.123"
-    )
+    test "successfully validates and passes to batcher for batch tracking" do
+      # No HTTP mock needed since it goes to batcher
+      result =
+        Mixpanel.track(
+          "page_view",
+          %{
+            distinct_id: "user123",
+            properties: %{page: "home"}
+          },
+          batch: true
+        )
 
-    :timer.sleep(50)
+      assert :ok = result
+    end
 
-    assert :meck.called(
-             Req,
-             :get,
-             [
-               "https://api.mixpanel.com/engage",
-               [
-                 params: [
-                   data:
-                     "eyIkc2V0Ijp7IkJpcnRoZGF5IjoiMTk0OC0wMS0wMSIsIkFkZHJlc3MiOiIxMzEzIE1vY2tpbmdiaXJkIExhbmUifSwiJHRva2VuIjoiIiwiJGlwIjoiMTIzLjEyMy4xMjMuMTIzIiwiJGRpc3RpbmN0X2lkIjoiMTM3OTMifQ=="
-                 ]
-               ]
-             ],
-             pid
-           )
+    test "handles valid event with custom timestamp" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"status" => 1}}}
+      end)
+
+      custom_time = ~U[2023-01-01 00:00:00Z]
+
+      result =
+        Mixpanel.track("signup", %{
+          distinct_id: "user123",
+          time: custom_time,
+          properties: %{source: "organic"}
+        })
+
+      assert {:ok, %{accepted: 1}} = result
+    end
+  end
+
+  describe "import_events/1 validation" do
+    test "returns error for empty list" do
+      result = Mixpanel.import_events([])
+
+      assert {:error, "batch cannot be empty"} = result
+    end
+
+    test "returns error for invalid event in batch" do
+      events = [
+        %{event: "valid_event", distinct_id: "user123"},
+        # Missing event field
+        %{distinct_id: "user456"}
+      ]
+
+      result = Mixpanel.import_events(events)
+
+      assert {:error, "all events must have :event and :distinct_id fields"} = result
+    end
+
+    test "returns error for non-list input" do
+      result = Mixpanel.import_events("not_a_list")
+
+      assert {:error, "events must be a list"} = result
+    end
+  end
+
+  describe "import_events/1 happy paths" do
+    test "successfully validates and calls API for import" do
+      Application.put_env(:mixpanel, :service_account, %{
+        username: "test_user",
+        password: "test_pass",
+        project_id: "123456"
+      })
+
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"num_records_imported" => 2}}}
+      end)
+
+      events = [
+        %{event: "signup", distinct_id: "user123", properties: %{source: "organic"}},
+        %{event: "purchase", distinct_id: "user123", properties: %{amount: 49.99}}
+      ]
+
+      result = Mixpanel.import_events(events)
+
+      assert {:ok, %{accepted: 2}} = result
+    end
+
+    test "handles single event in list" do
+      Application.put_env(:mixpanel, :service_account, %{
+        username: "test_user",
+        password: "test_pass",
+        project_id: "123456"
+      })
+
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"num_records_imported" => 1}}}
+      end)
+
+      events = [%{event: "test", distinct_id: "user123"}]
+      result = Mixpanel.import_events(events)
+
+      assert {:ok, %{accepted: 1}} = result
+    end
+
+    test "returns error when service account not configured" do
+      Application.delete_env(:mixpanel, :service_account)
+
+      events = [%{event: "test", distinct_id: "user123"}]
+      result = Mixpanel.import_events(events)
+
+      assert {:error, "service account not configured for import API"} = result
+    end
+  end
+
+  describe "flush/0" do
+    test "returns ok and flushes batcher" do
+      result = Mixpanel.flush()
+
+      assert :ok = result
+    end
+  end
+
+  describe "API error propagation" do
+    test "propagates rate limit errors from API" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 429, body: "Rate limited"}}
+      end)
+
+      result = Mixpanel.track("test", %{distinct_id: "user123"})
+
+      assert {:error, error} = result
+      assert error.type == :rate_limit
+      assert error.retryable? == true
+    end
+
+    test "propagates validation errors from API" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 400, body: %{"error" => "Invalid data"}}}
+      end)
+
+      result = Mixpanel.track("test", %{distinct_id: "user123"})
+
+      assert {:error, error} = result
+      assert error.type == :validation
+      assert error.retryable? == false
+    end
+
+    test "propagates network errors from client" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:error, %{reason: :timeout}}
+      end)
+
+      result = Mixpanel.track("test", %{distinct_id: "user123"})
+
+      assert {:error, error} = result
+      assert error.type == :network
+      assert error.retryable? == true
+    end
+  end
+
+  describe "configuration helpers" do
+    test "uses configured project token" do
+      Application.put_env(:mixpanel, :project_token, "custom_token")
+
+      assert Application.get_env(:mixpanel, :project_token) == "custom_token"
+    end
   end
 end

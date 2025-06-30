@@ -1,96 +1,195 @@
 defmodule Mixpanel do
   @moduledoc """
   Elixir client for the Mixpanel API.
+
+  This module provides a simple, idiomatic Elixir interface for tracking events
+  and importing historical data to Mixpanel. It handles batching, rate limiting,
+  and error recovery automatically.
+
+  ## Configuration
+
+      config :mixpanel,
+        project_token: "your_project_token",
+        service_account: %{
+          username: "your_username",
+          password: "your_password",
+          project_id: "your_project_id"
+        }
+
+  ## Examples
+
+      # Track a single event
+      Mixpanel.track("button_clicked", %{
+        distinct_id: "user123",
+        properties: %{button_id: "submit"}
+      })
+
+      # Import historical events
+      Mixpanel.import_events([
+        %{event: "signup", distinct_id: "user123", time: ~U[2023-01-01 00:00:00Z]},
+        %{event: "purchase", distinct_id: "user123", time: ~U[2023-01-02 00:00:00Z]}
+      ])
+
+      # Use batching for high-throughput scenarios
+      Mixpanel.track("page_view", %{distinct_id: "user123"}, batch: true)
+      Mixpanel.flush()  # Flush pending batched events
   """
 
+  alias Mixpanel.API
+
+  @type response :: {:ok, map()} | {:error, String.t() | map()}
+  @type event_data :: %{
+          distinct_id: String.t(),
+          properties: map(),
+          time: DateTime.t() | integer()
+        }
+
   @doc """
-  Tracks an event.
+  Track a single event.
 
-  ## Arguments
+  ## Parameters
 
-    * `event`      - A name for the event
-    * `properties` - A collection of properties associated with this event.
-    * `opts`       - The options
+    * `event_name` - The name of the event to track
+    * `event_data` - Map containing event data with required `:distinct_id`
+    * `opts` - Optional keyword list of options
 
   ## Options
 
-    * `:distinct_id` - The value of distinct_id will be treated as a string, and used to uniquely identify a user associated with your event. If you provide a distinct_id property with your events, you can track a given user through funnels and distinguish unique users for retention analyses. You should always send the same distinct_id when an event is triggered by the same user.
-    * `:time`        - The time an event occurred. If present, the value should be a unix timestamp (seconds since midnight, January 1st, 1970 - UTC). If this property is not included in your request, Mixpanel will use the time the event arrives at the server.
-    * `:ip`          - An IP address string (e.g. "127.0.0.1") associated with the event. This is used for adding geolocation data to events, and should only be required if you are making requests from your backend. If `:ip` is absent, Mixpanel will ignore the IP address of the request.
+    * `:batch` - If true, add event to batch instead of sending immediately
 
+  ## Examples
+
+      # Track immediately
+      Mixpanel.track("button_clicked", %{
+        distinct_id: "user123",
+        properties: %{button_id: "submit"}
+      })
+
+      # Add to batch
+      Mixpanel.track("page_view", %{
+        distinct_id: "user123"
+      }, batch: true)
+
+  ## Returns
+
+    * `{:ok, %{accepted: 1}}` - Event tracked successfully
+    * `:ok` - Event added to batch (when `batch: true`)
+    * `{:error, reason}` - Validation or API error
   """
-  @spec track(String.t(), Map.t(), Keyword.t()) :: :ok
-  def track(event, properties \\ %{}, opts \\ []) do
-    properties =
-      properties
-      |> track_put_time(Keyword.get(opts, :time))
-      |> track_put_distinct_id(Keyword.get(opts, :distinct_id))
-      |> track_put_ip(Keyword.get(opts, :ip))
+  @spec track(String.t(), event_data(), keyword()) :: response() | :ok
+  def track(event_name, event_data, opts \\ []) do
+    case validate_track_inputs(event_name, event_data) do
+      :ok ->
+        API.Events.track(event_name, event_data, opts)
 
-    Mixpanel.Client.track(event, properties)
-
-    :ok
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
-
-  defp track_put_time(properties, nil), do: properties
-
-  defp track_put_time(properties, {mega_secs, secs, _ms}),
-    do: track_put_time(properties, mega_secs * 10_000 + secs)
-
-  defp track_put_time(properties, secs) when is_integer(secs),
-    do: Map.put(properties, :time, secs)
-
-  defp track_put_distinct_id(properties, nil), do: properties
-
-  defp track_put_distinct_id(properties, distinct_id),
-    do: Map.put(properties, :distinct_id, distinct_id)
-
-  defp track_put_ip(properties, nil), do: properties
-  defp track_put_ip(properties, ip), do: Map.put(properties, :ip, convert_ip(ip))
 
   @doc """
-  Stores a user profile
+  Import a batch of historical events.
 
-  ## Arguments
+  Requires a service account to be configured for authentication.
 
-  * `distinct_id` - This is a string that identifies the profile you would like to update.
-  * `operation`   - A name for the event
-  * `value`       - A collection of properties associated with this event.
-  * `opts`        - The options
+  ## Parameters
 
-  ## Options
+    * `events` - List of event maps, each containing `:event`, `:distinct_id`, and optionally `:time` and `:properties`
 
-  * `:ip`          - The IP address associated with a given profile. If `:ip` isn't provided, Mixpanel will use the IP address of the request. Mixpanel uses an IP address to guess at the geographic location of users. If `:ip` is set to "0", Mixpanel will ignore IP information.
-  * `:time`        - Seconds since midnight, January 1st 1970, UTC. Updates are applied in `:time` order, so setting this value can lead to unexpected results unless care is taken. If `:time` is not included in a request, Mixpanel will use the time the update arrives at the Mixpanel server.
-  * `:ignore_time` - If the `:ignore_time` property is present and `true` in your update request, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time for all $set, $append, and $add operations.
+  ## Examples
+
+      events = [
+        %{
+          event: "signup",
+          distinct_id: "user123", 
+          time: ~U[2023-01-01 00:00:00Z],
+          properties: %{source: "organic"}
+        },
+        %{
+          event: "first_purchase",
+          distinct_id: "user123",
+          time: ~U[2023-01-02 00:00:00Z], 
+          properties: %{amount: 49.99}
+        }
+      ]
+
+      Mixpanel.import_events(events)
+
+  ## Returns
+
+    * `{:ok, %{accepted: count}}` - Events imported successfully
+    * `{:error, reason}` - Validation, configuration, or API error
   """
-  @spec engage(String.t(), String.t(), Map.t(), Keyword.t()) :: :ok
-  def engage(distinct_id, operation, value \\ %{}, opts \\ []) do
-    event =
-      %{"$distinct_id": distinct_id}
-      |> Map.put(operation, value)
-      |> engage_put_ip(Keyword.get(opts, :ip))
-      |> engage_put_time(Keyword.get(opts, :time))
-      |> engage_put_ignore_time(Keyword.get(opts, :ignore_time))
+  @spec import_events([map()]) :: response()
+  def import_events(events) when is_list(events) do
+    case validate_import_inputs(events) do
+      :ok ->
+        API.Events.import(events)
 
-    Mixpanel.Client.engage(event)
-
-    :ok
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
-  defp engage_put_ip(event, nil), do: event
-  defp engage_put_ip(event, ip), do: Map.put(event, :"$ip", convert_ip(ip))
+  def import_events(_events) do
+    {:error, "events must be a list"}
+  end
 
-  defp engage_put_time(event, nil), do: event
+  @doc """
+  Flush all pending batched events immediately.
 
-  defp engage_put_time(event, {mega_secs, secs, _ms}),
-    do: engage_put_time(event, mega_secs * 10_000 + secs)
+  This forces any events that have been queued via `track/3` with `batch: true`
+  to be sent to Mixpanel immediately, rather than waiting for the batch size
+  or timeout to be reached.
 
-  defp engage_put_time(event, secs) when is_integer(secs), do: Map.put(event, :"$time", secs)
+  ## Examples
 
-  defp engage_put_ignore_time(event, true), do: Map.put(event, :"$ignore_time", "true")
-  defp engage_put_ignore_time(event, _), do: event
+      # Add some events to batch
+      Mixpanel.track("event1", %{distinct_id: "user1"}, batch: true)
+      Mixpanel.track("event2", %{distinct_id: "user2"}, batch: true)
 
-  defp convert_ip({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
-  defp convert_ip(ip), do: ip |> :inet.ntoa() |> to_string()
+      # Force send now
+      Mixpanel.flush()
+
+  ## Returns
+
+    * `:ok` - Flush completed (events may or may not have been sent successfully)
+  """
+  @spec flush() :: :ok
+  def flush do
+    Mixpanel.Batcher.flush()
+  end
+
+  # Private validation functions
+
+  defp validate_track_inputs("", _event_data) do
+    {:error, "event name cannot be empty"}
+  end
+
+  defp validate_track_inputs(_event_name, event_data) do
+    if Map.has_key?(event_data, :distinct_id) do
+      :ok
+    else
+      {:error, "distinct_id is required"}
+    end
+  end
+
+  defp validate_import_inputs([]) do
+    {:error, "batch cannot be empty"}
+  end
+
+  defp validate_import_inputs(events) when is_list(events) do
+    # Basic validation - detailed validation happens in API.Events
+    case Enum.find(events, fn event ->
+           not is_map(event) or not Map.has_key?(event, :event) or
+             not Map.has_key?(event, :distinct_id)
+         end) do
+      nil -> :ok
+      _invalid_event -> {:error, "all events must have :event and :distinct_id fields"}
+    end
+  end
+
+  defp validate_import_inputs(_) do
+    {:error, "events must be a list"}
+  end
 end
