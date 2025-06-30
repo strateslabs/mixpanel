@@ -1,0 +1,51 @@
+defmodule Mixpanel.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :mixpanel,
+      version: "0.1.0",
+      elixir: "~> 1.18",
+      start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
+      deps: deps(),
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/project.plt"},
+        plt_core_path: "priv/plts/core.plt",
+        plt_add_apps: [:ex_unit]
+      ]
+    ]
+  end
+
+  # Run "mix help compile.app" to learn about applications.
+  def application do
+    [
+      extra_applications: [:logger, :httpoison, :poison],
+      mod: {Mixpanel.Application, []}
+    ]
+  end
+
+  # Run "mix help deps" to learn about dependencies.
+  defp deps do
+    [
+      {:credo, "~> 1.7.0", only: [:dev, :test]},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:httpoison, "~> 2.1"},
+      {:jason, "~> 1.4"},
+      {:mock, "~> 0.3.1", only: :test},
+      {:poison, "~> 5.0"},
+      {:styler, "~> 1.1", only: [:dev, :test]}
+    ]
+  end
+
+  defp aliases do
+    [
+      check: [
+        "format --check-formatted",
+        "credo --all",
+        "compile --warnings-as-errors",
+        "dialyzer --format short"
+      ]
+    ]
+  end
+end
