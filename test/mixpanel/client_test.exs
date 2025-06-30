@@ -150,7 +150,7 @@ defmodule Mixpanel.ClientTest do
         Req.Test.json(conn, %{"num_records_imported" => 1})
       end)
 
-      assert {:ok, %{accepted: 1}} = Mixpanel.Client.import(events, service_account)
+      assert {:ok, %{accepted: 1}} = Mixpanel.Client.track_many(events, service_account)
     end
 
     test "handles import-specific success response format" do
@@ -161,7 +161,7 @@ defmodule Mixpanel.ClientTest do
         Req.Test.json(conn, %{"num_records_imported" => 5})
       end)
 
-      assert {:ok, %{accepted: 5}} = Mixpanel.Client.import(events, service_account)
+      assert {:ok, %{accepted: 5}} = Mixpanel.Client.track_many(events, service_account)
     end
   end
 end

@@ -40,7 +40,7 @@ defmodule Mixpanel.API.EventsTest do
       Application.delete_env(:mixpanel, :service_account)
 
       events = [%{event: "test", device_id: "device-uuid-123"}]
-      result = Mixpanel.API.Events.import(events)
+      result = Mixpanel.API.Events.track_many(events)
 
       assert {:error, "service account not configured for import API"} = result
     end
@@ -49,7 +49,7 @@ defmodule Mixpanel.API.EventsTest do
       service_account = %{username: "user", password: "pass", project_id: "123"}
       Application.put_env(:mixpanel, :service_account, service_account)
 
-      result = Mixpanel.API.Events.import([])
+      result = Mixpanel.API.Events.track_many([])
 
       assert {:error, "batch cannot be empty"} = result
     end

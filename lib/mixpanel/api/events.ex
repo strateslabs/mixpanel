@@ -98,8 +98,8 @@ defmodule Mixpanel.API.Events do
     end
   end
 
-  @spec import([map()]) :: response()
-  def import(events) do
+  @spec track_many([map()]) :: response()
+  def track_many(events) do
     start_time = System.monotonic_time()
     event_count = length(events)
 
@@ -112,7 +112,7 @@ defmodule Mixpanel.API.Events do
           with {:ok, validated_events} <- validate_import_batch(events) do
             payloads = Enum.map(validated_events, &Event.to_import_payload/1)
 
-            Client.import(payloads, service_account)
+            Client.track_many(payloads, service_account)
           end
       end
 

@@ -25,8 +25,8 @@ defmodule Mixpanel.Client do
     make_request(url, payload, headers)
   end
 
-  @spec import([map()], Auth.service_account()) :: response()
-  def import(events, service_account) do
+  @spec track_many([map()], Auth.service_account()) :: response()
+  def track_many(events, service_account) do
     url = "#{Config.base_url()}/import"
     headers = Auth.import_headers(service_account)
 

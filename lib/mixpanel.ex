@@ -112,7 +112,7 @@ defmodule Mixpanel do
       events = [
         %{
           event: "signup",
-          device_id: "device-uuid-123", 
+          device_id: "device-uuid-123",
           time: ~U[2023-01-01 00:00:00Z],
           source: "organic"
         },
@@ -120,7 +120,7 @@ defmodule Mixpanel do
           event: "first_purchase",
           device_id: "device-uuid-123",
           user_id: "user@example.com",
-          time: ~U[2023-01-02 00:00:00Z], 
+          time: ~U[2023-01-02 00:00:00Z],
           amount: 49.99
         }
       ]
@@ -136,7 +136,7 @@ defmodule Mixpanel do
   def track_many(events) when is_list(events) do
     case validate_import_inputs(events) do
       :ok ->
-        API.Events.import(events)
+        API.Events.track_many(events)
 
       {:error, reason} ->
         {:error, reason}
