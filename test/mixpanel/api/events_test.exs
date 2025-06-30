@@ -13,9 +13,9 @@ defmodule Mixpanel.API.EventsTest do
 
   describe "track/2" do
     test "returns validation error for invalid event" do
-      result = Mixpanel.API.Events.track("", %{distinct_id: "user123"})
+      result = Mixpanel.API.Events.track("", %{device_id: "device-uuid-123"})
 
-      assert {:error, "event name cannot be empty"} = result
+      assert {:error, "event name is required"} = result
     end
   end
 
@@ -27,7 +27,7 @@ defmodule Mixpanel.API.EventsTest do
     end
 
     test "returns error for batch that is too large" do
-      large_batch = for i <- 1..2001, do: %{event: "test", distinct_id: "user#{i}"}
+      large_batch = for i <- 1..2001, do: %{event: "test", device_id: "device-uuid-#{i}"}
 
       result = Mixpanel.API.Events.track_batch(large_batch)
 
@@ -39,7 +39,7 @@ defmodule Mixpanel.API.EventsTest do
     test "returns error when service account is not configured" do
       Application.delete_env(:mixpanel, :service_account)
 
-      events = [%{event: "test", distinct_id: "user123"}]
+      events = [%{event: "test", device_id: "device-uuid-123"}]
       result = Mixpanel.API.Events.import(events)
 
       assert {:error, "service account not configured for import API"} = result

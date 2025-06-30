@@ -52,7 +52,7 @@ defmodule Mixpanel.IntegrationTest do
         # Verify the payload structure
         payload = opts[:json]
         assert payload.event == "purchase"
-        assert payload.properties.distinct_id == "user123"
+        assert payload.properties["$device_id"] == "device-uuid-123"
         assert payload.properties.amount == 99.99
         assert payload.properties.token == "test_token_123"
         assert is_integer(payload.properties.time)
@@ -67,11 +67,9 @@ defmodule Mixpanel.IntegrationTest do
 
       result =
         Mixpanel.track("purchase", %{
-          distinct_id: "user123",
-          properties: %{
-            amount: 99.99,
-            currency: "USD"
-          }
+          device_id: "device-uuid-123",
+          amount: 99.99,
+          currency: "USD"
         })
 
       assert {:ok, %{accepted: 1}} = result
@@ -89,9 +87,9 @@ defmodule Mixpanel.IntegrationTest do
 
       result =
         Mixpanel.track("signup", %{
-          distinct_id: "user123",
+          device_id: "device-uuid-123",
           time: custom_time,
-          properties: %{source: "organic"}
+          source: "organic"
         })
 
       assert {:ok, %{accepted: 1}} = result
@@ -107,8 +105,8 @@ defmodule Mixpanel.IntegrationTest do
         Mixpanel.track(
           "page_view",
           %{
-            distinct_id: "user123",
-            properties: %{page: "home"}
+            device_id: "device-uuid-123",
+            page: "home"
           },
           batch: true
         )
@@ -133,13 +131,13 @@ defmodule Mixpanel.IntegrationTest do
 
         [event1, event2] = events
         assert event1.event == "signup"
-        assert event1.properties.distinct_id == "user123"
+        assert event1.properties["$device_id"] == "device-uuid-123"
         assert event1.properties.token == "test_token_123"
         assert event1.properties.project_id == "123456"
         assert event1.properties.source == "organic"
 
         assert event2.event == "first_purchase"
-        assert event2.properties.distinct_id == "user123"
+        assert event2.properties["$device_id"] == "device-uuid-123"
         assert event2.properties.amount == 49.99
 
         # Verify basic auth headers
@@ -155,15 +153,15 @@ defmodule Mixpanel.IntegrationTest do
       events = [
         %{
           event: "signup",
-          distinct_id: "user123",
+          device_id: "device-uuid-123",
           time: ~U[2023-01-01 00:00:00Z],
-          properties: %{source: "organic"}
+          source: "organic"
         },
         %{
           event: "first_purchase",
-          distinct_id: "user123",
+          device_id: "device-uuid-123",
           time: ~U[2023-01-02 00:00:00Z],
-          properties: %{amount: 49.99}
+          amount: 49.99
         }
       ]
 
@@ -181,8 +179,8 @@ defmodule Mixpanel.IntegrationTest do
       events = [
         %{
           event: "test_event",
-          distinct_id: "user123",
-          properties: %{test: "value"}
+          device_id: "device-uuid-123",
+          test: "value"
         }
       ]
 
@@ -194,8 +192,8 @@ defmodule Mixpanel.IntegrationTest do
   describe "flush/0 happy path" do
     test "successfully flushes batched events" do
       # First add some events to the batch
-      Mixpanel.track("event1", %{distinct_id: "user1"}, batch: true)
-      Mixpanel.track("event2", %{distinct_id: "user2"}, batch: true)
+      Mixpanel.track("event1", %{device_id: "device-uuid-123"}, batch: true)
+      Mixpanel.track("event2", %{device_id: "device-uuid-456"}, batch: true)
 
       result = Mixpanel.flush()
       assert :ok = result
@@ -214,7 +212,7 @@ defmodule Mixpanel.IntegrationTest do
         {:ok, %{status: 429, body: "Rate limited"}}
       end)
 
-      result = Mixpanel.track("test_event", %{distinct_id: "user123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :rate_limit
@@ -227,7 +225,7 @@ defmodule Mixpanel.IntegrationTest do
         {:ok, %{status: 400, body: %{"error" => "Invalid event data"}}}
       end)
 
-      result = Mixpanel.track("test_event", %{distinct_id: "user123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :validation
@@ -240,7 +238,7 @@ defmodule Mixpanel.IntegrationTest do
         {:error, %{reason: :timeout}}
       end)
 
-      result = Mixpanel.track("test_event", %{distinct_id: "user123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :network
@@ -259,7 +257,7 @@ defmodule Mixpanel.IntegrationTest do
         {:ok, %{status: 200, body: %{"status" => 1}}}
       end)
 
-      result = Mixpanel.track("test_event", %{distinct_id: "user123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
       assert {:ok, %{accepted: 1}} = result
     end
 
@@ -292,7 +290,7 @@ defmodule Mixpanel.IntegrationTest do
 
       result =
         Mixpanel.import_events([
-          %{event: "test", distinct_id: "user123"}
+          %{event: "test", device_id: "device-uuid-123"}
         ])
 
       assert {:ok, %{accepted: 1}} = result
@@ -309,8 +307,8 @@ defmodule Mixpanel.IntegrationTest do
       Process.sleep(20)
 
       # Add events to reach batch limit
-      Mixpanel.track("event1", %{distinct_id: "user1"}, batch: true)
-      Mixpanel.track("event2", %{distinct_id: "user2"}, batch: true)
+      Mixpanel.track("event1", %{device_id: "device-uuid-123"}, batch: true)
+      Mixpanel.track("event2", %{device_id: "device-uuid-456"}, batch: true)
 
       # Give time for async batch processing  
       Process.sleep(100)

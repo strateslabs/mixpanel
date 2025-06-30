@@ -18,31 +18,34 @@ defmodule Mixpanel do
 
   ## Examples
 
-      # Track a single event
-      Mixpanel.track("button_clicked", %{
-        distinct_id: "user123",
-        properties: %{button_id: "submit"}
+      # Anonymous user tracking
+      Mixpanel.track("page_view", %{
+        device_id: "device-uuid-123",
+        page: "/home"
+      })
+
+      # Identified user tracking
+      Mixpanel.track("purchase", %{
+        device_id: "device-uuid-123",
+        user_id: "user@example.com",
+        amount: 99.99
       })
 
       # Import historical events
       Mixpanel.import_events([
-        %{event: "signup", distinct_id: "user123", time: ~U[2023-01-01 00:00:00Z]},
-        %{event: "purchase", distinct_id: "user123", time: ~U[2023-01-02 00:00:00Z]}
+        %{event: "signup", device_id: "device-uuid-123", time: ~U[2023-01-01 00:00:00Z], source: "organic"},
+        %{event: "purchase", device_id: "device-uuid-123", user_id: "user@example.com", time: ~U[2023-01-02 00:00:00Z], amount: 99.99}
       ])
 
       # Use batching for high-throughput scenarios
-      Mixpanel.track("page_view", %{distinct_id: "user123"}, batch: true)
+      Mixpanel.track("page_view", %{device_id: "device-uuid-123"}, batch: true)
       Mixpanel.flush()  # Flush pending batched events
   """
 
   alias Mixpanel.API
 
   @type response :: {:ok, map()} | {:error, String.t() | map()}
-  @type event_data :: %{
-          distinct_id: String.t(),
-          properties: map(),
-          time: DateTime.t() | integer()
-        }
+  @type properties :: map()
 
   @doc """
   Track a single event.
@@ -50,7 +53,7 @@ defmodule Mixpanel do
   ## Parameters
 
     * `event_name` - The name of the event to track
-    * `event_data` - Map containing event data with required `:distinct_id`
+    * `properties` - Map containing event properties with required `:device_id`
     * `opts` - Optional keyword list of options
 
   ## Options
@@ -59,15 +62,22 @@ defmodule Mixpanel do
 
   ## Examples
 
-      # Track immediately
-      Mixpanel.track("button_clicked", %{
-        distinct_id: "user123",
-        properties: %{button_id: "submit"}
+      # Anonymous user
+      Mixpanel.track("page_view", %{
+        device_id: "device-uuid-123",
+        page: "/home"
+      })
+
+      # Identified user
+      Mixpanel.track("purchase", %{
+        device_id: "device-uuid-123",
+        user_id: "user@example.com",
+        amount: 99.99
       })
 
       # Add to batch
       Mixpanel.track("page_view", %{
-        distinct_id: "user123"
+        device_id: "device-uuid-123"
       }, batch: true)
 
   ## Returns
@@ -76,11 +86,11 @@ defmodule Mixpanel do
     * `:ok` - Event added to batch (when `batch: true`)
     * `{:error, reason}` - Validation or API error
   """
-  @spec track(String.t(), event_data(), keyword()) :: response() | :ok
-  def track(event_name, event_data, opts \\ []) do
-    case validate_track_inputs(event_name, event_data) do
+  @spec track(String.t(), properties(), keyword()) :: response() | :ok
+  def track(event_name, properties, opts \\ []) do
+    case validate_track_inputs(event_name, properties) do
       :ok ->
-        API.Events.track(event_name, event_data, opts)
+        API.Events.track(event_name, properties, opts)
 
       {:error, reason} ->
         {:error, reason}
@@ -94,22 +104,23 @@ defmodule Mixpanel do
 
   ## Parameters
 
-    * `events` - List of event maps, each containing `:event`, `:distinct_id`, and optionally `:time` and `:properties`
+    * `events` - List of event maps, each containing `:event`, `:device_id`, and optionally `:time`, `:user_id`, `:ip`, and other properties
 
   ## Examples
 
       events = [
         %{
           event: "signup",
-          distinct_id: "user123", 
+          device_id: "device-uuid-123", 
           time: ~U[2023-01-01 00:00:00Z],
-          properties: %{source: "organic"}
+          source: "organic"
         },
         %{
           event: "first_purchase",
-          distinct_id: "user123",
+          device_id: "device-uuid-123",
+          user_id: "user@example.com",
           time: ~U[2023-01-02 00:00:00Z], 
-          properties: %{amount: 49.99}
+          amount: 49.99
         }
       ]
 
@@ -145,8 +156,8 @@ defmodule Mixpanel do
   ## Examples
 
       # Add some events to batch
-      Mixpanel.track("event1", %{distinct_id: "user1"}, batch: true)
-      Mixpanel.track("event2", %{distinct_id: "user2"}, batch: true)
+      Mixpanel.track("event1", %{device_id: "device-uuid-123"}, batch: true)
+      Mixpanel.track("event2", %{device_id: "device-uuid-456"}, batch: true)
 
       # Force send now
       Mixpanel.flush()
@@ -162,15 +173,15 @@ defmodule Mixpanel do
 
   # Private validation functions
 
-  defp validate_track_inputs("", _event_data) do
+  defp validate_track_inputs("", _properties) do
     {:error, "event name cannot be empty"}
   end
 
-  defp validate_track_inputs(_event_name, event_data) do
-    if Map.has_key?(event_data, :distinct_id) do
+  defp validate_track_inputs(_event_name, properties) do
+    if Map.has_key?(properties, :device_id) do
       :ok
     else
-      {:error, "distinct_id is required"}
+      {:error, "device_id is required"}
     end
   end
 
@@ -182,10 +193,10 @@ defmodule Mixpanel do
     # Basic validation - detailed validation happens in API.Events
     case Enum.find(events, fn event ->
            not is_map(event) or not Map.has_key?(event, :event) or
-             not Map.has_key?(event, :distinct_id)
+             not Map.has_key?(event, :device_id)
          end) do
       nil -> :ok
-      _invalid_event -> {:error, "all events must have :event and :distinct_id fields"}
+      _invalid_event -> {:error, "all events must have :event and :device_id fields"}
     end
   end
 

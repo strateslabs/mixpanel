@@ -54,9 +54,7 @@ defmodule Mixpanel.API.Events do
       event = Event.new(event_name, event_data)
       Event.validate(event)
     rescue
-      ArgumentError -> {:error, "event name cannot be empty"}
-    catch
-      ArgumentError -> {:error, "distinct_id is required"}
+      e in ArgumentError -> {:error, Exception.message(e)}
     end
   end
 
@@ -71,8 +69,13 @@ defmodule Mixpanel.API.Events do
   defp validate_event_batch(events) do
     try do
       validated_events =
-        Enum.map(events, fn event_data ->
-          event = Event.new(event_data)
+        Enum.map(events, fn event_or_data ->
+          # Handle both Event structs and raw data maps
+          event = 
+            case event_or_data do
+              %Event{} = event -> event
+              event_data -> Event.new(event_data)
+            end
 
           case Event.validate(event) do
             {:ok, validated_event} -> validated_event

@@ -29,15 +29,15 @@ defmodule MixpanelTest do
 
   describe "track/2 validation" do
     test "returns error for invalid event" do
-      result = Mixpanel.track("", %{distinct_id: "user123"})
+      result = Mixpanel.track("", %{device_id: "device-uuid-123"})
 
       assert {:error, "event name cannot be empty"} = result
     end
 
-    test "returns error when distinct_id is missing" do
+    test "returns error when device_id is missing" do
       result = Mixpanel.track("test_event", %{})
 
-      assert {:error, "distinct_id is required"} = result
+      assert {:error, "device_id is required"} = result
     end
   end
 
@@ -50,8 +50,8 @@ defmodule MixpanelTest do
 
       result =
         Mixpanel.track("purchase", %{
-          distinct_id: "user123",
-          properties: %{amount: 99.99}
+          device_id: "device-uuid-123",
+          amount: 99.99
         })
 
       assert {:ok, %{accepted: 1}} = result
@@ -63,8 +63,8 @@ defmodule MixpanelTest do
         Mixpanel.track(
           "page_view",
           %{
-            distinct_id: "user123",
-            properties: %{page: "home"}
+            device_id: "device-uuid-123",
+            page: "home"
           },
           batch: true
         )
@@ -81,9 +81,40 @@ defmodule MixpanelTest do
 
       result =
         Mixpanel.track("signup", %{
-          distinct_id: "user123",
+          device_id: "device-uuid-123",
           time: custom_time,
-          properties: %{source: "organic"}
+          source: "organic"
+        })
+
+      assert {:ok, %{accepted: 1}} = result
+    end
+
+    test "handles event with user_id for identified user" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"status" => 1}}}
+      end)
+
+      result =
+        Mixpanel.track("login", %{
+          device_id: "device-uuid-123",
+          user_id: "user@example.com",
+          method: "password"
+        })
+
+      assert {:ok, %{accepted: 1}} = result
+    end
+
+    test "handles event with ip for geolocation" do
+      expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
+        {:ok, %{status: 200, body: %{"status" => 1}}}
+      end)
+
+      result =
+        Mixpanel.track("page_view", %{
+          device_id: "device-uuid-123",
+          user_id: "user@example.com", 
+          ip: "192.168.1.1",
+          page: "home"
         })
 
       assert {:ok, %{accepted: 1}} = result
@@ -99,14 +130,14 @@ defmodule MixpanelTest do
 
     test "returns error for invalid event in batch" do
       events = [
-        %{event: "valid_event", distinct_id: "user123"},
+        %{event: "valid_event", device_id: "device-uuid-123"},
         # Missing event field
-        %{distinct_id: "user456"}
+        %{device_id: "device-uuid-456"}
       ]
 
       result = Mixpanel.import_events(events)
 
-      assert {:error, "all events must have :event and :distinct_id fields"} = result
+      assert {:error, "all events must have :event and :device_id fields"} = result
     end
 
     test "returns error for non-list input" do
@@ -129,8 +160,8 @@ defmodule MixpanelTest do
       end)
 
       events = [
-        %{event: "signup", distinct_id: "user123", properties: %{source: "organic"}},
-        %{event: "purchase", distinct_id: "user123", properties: %{amount: 49.99}}
+        %{event: "signup", device_id: "device-uuid-123", source: "organic"},
+        %{event: "purchase", device_id: "device-uuid-123", user_id: "user123", amount: 49.99}
       ]
 
       result = Mixpanel.import_events(events)
@@ -149,7 +180,7 @@ defmodule MixpanelTest do
         {:ok, %{status: 200, body: %{"num_records_imported" => 1}}}
       end)
 
-      events = [%{event: "test", distinct_id: "user123"}]
+      events = [%{event: "test", device_id: "device-uuid-123"}]
       result = Mixpanel.import_events(events)
 
       assert {:ok, %{accepted: 1}} = result
@@ -158,7 +189,7 @@ defmodule MixpanelTest do
     test "returns error when service account not configured" do
       Application.delete_env(:mixpanel, :service_account)
 
-      events = [%{event: "test", distinct_id: "user123"}]
+      events = [%{event: "test", device_id: "device-uuid-123"}]
       result = Mixpanel.import_events(events)
 
       assert {:error, "service account not configured for import API"} = result
@@ -179,7 +210,7 @@ defmodule MixpanelTest do
         {:ok, %{status: 429, body: "Rate limited"}}
       end)
 
-      result = Mixpanel.track("test", %{distinct_id: "user123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :rate_limit
@@ -191,7 +222,7 @@ defmodule MixpanelTest do
         {:ok, %{status: 400, body: %{"error" => "Invalid data"}}}
       end)
 
-      result = Mixpanel.track("test", %{distinct_id: "user123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :validation
@@ -203,7 +234,7 @@ defmodule MixpanelTest do
         {:error, %{reason: :timeout}}
       end)
 
-      result = Mixpanel.track("test", %{distinct_id: "user123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
 
       assert {:error, error} = result
       assert error.type == :network

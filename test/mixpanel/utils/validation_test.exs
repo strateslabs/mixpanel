@@ -69,23 +69,23 @@ defmodule Mixpanel.Utils.ValidationTest do
 
   describe "validate_required_fields/2" do
     test "accepts data with all required fields" do
-      data = %{event: "test", distinct_id: "user123"}
-      required = [:event, :distinct_id]
+      data = %{event: "test", device_id: "device-uuid-123"}
+      required = [:event, :device_id]
 
       assert :ok = Mixpanel.Utils.Validation.validate_required_fields(data, required)
     end
 
     test "rejects data missing required field" do
       data = %{event: "test"}
-      required = [:event, :distinct_id]
+      required = [:event, :device_id]
 
-      assert {:error, "distinct_id is required"} =
+      assert {:error, "device_id is required"} =
                Mixpanel.Utils.Validation.validate_required_fields(data, required)
     end
 
     test "rejects data with empty required field" do
-      data = %{event: "", distinct_id: "user123"}
-      required = [:event, :distinct_id]
+      data = %{event: "", device_id: "device-uuid-123"}
+      required = [:event, :device_id]
 
       assert {:error, "event cannot be empty"} =
                Mixpanel.Utils.Validation.validate_required_fields(data, required)

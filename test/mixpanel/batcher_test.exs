@@ -19,7 +19,7 @@ defmodule Mixpanel.BatcherTest do
 
   describe "add_event/1" do
     test "adds event to batch" do
-      event = %{event: "test_event", distinct_id: "user123"}
+      event = %{event: "test_event", device_id: "device-uuid-123"}
       assert :ok = Mixpanel.Batcher.add_event(event)
 
       # Check internal state

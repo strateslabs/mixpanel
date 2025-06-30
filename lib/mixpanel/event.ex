@@ -7,43 +7,50 @@ defmodule Mixpanel.Event do
 
   @type t :: %__MODULE__{
           event: String.t(),
-          distinct_id: String.t(),
           properties: map(),
           time: integer()
         }
 
-  defstruct [:event, :distinct_id, :properties, :time]
+  defstruct [:event, :properties, :time]
 
   @spec new(String.t(), map()) :: t()
-  def new("", _event_data) do
+  def new("", _properties) do
     raise ArgumentError, "event name is required"
   end
 
-  def new(_event_name, event_data) when not is_map_key(event_data, :distinct_id) do
-    raise ArgumentError, "distinct_id is required"
+  def new(_event_name, properties) when not is_map_key(properties, :device_id) do
+    raise ArgumentError, "device_id is required"
   end
 
-  def new(event_name, %{distinct_id: distinct_id} = event_data) do
-    properties = Map.get(event_data, :properties, %{})
-    time = normalize_time(Map.get(event_data, :time, current_timestamp()))
+  def new(event_name, properties) when is_map(properties) do
+    time = normalize_time(Map.get(properties, :time, current_timestamp()))
+    # Remove time from properties since it's stored separately
+    final_properties = Map.delete(properties, :time)
 
     %__MODULE__{
       event: event_name,
-      distinct_id: distinct_id,
-      properties: properties,
+      properties: final_properties,
       time: time
     }
   end
 
   @spec new(map()) :: t()
-  def new(%{event: event_name, distinct_id: distinct_id} = event_data) do
-    properties = Map.get(event_data, :properties, %{})
-    time = normalize_time(Map.get(event_data, :time, current_timestamp()))
+  def new(%{event: event_name} = event_data) when is_binary(event_name) and event_name != "" do
+    # Separate event name from the rest of the properties
+    properties = Map.delete(event_data, :event)
+    
+    # Check for required device_id
+    unless Map.has_key?(properties, :device_id) do
+      raise ArgumentError, "device_id is required"
+    end
+    
+    time = normalize_time(Map.get(properties, :time, current_timestamp()))
+    # Remove time from properties since it's stored separately
+    final_properties = Map.delete(properties, :time)
 
     %__MODULE__{
       event: event_name,
-      distinct_id: distinct_id,
-      properties: properties,
+      properties: final_properties,
       time: time
     }
   end
@@ -56,14 +63,16 @@ defmodule Mixpanel.Event do
     raise ArgumentError, "event name is required"
   end
 
-  def new(event_data) when not is_map_key(event_data, :distinct_id) do
-    raise ArgumentError, "distinct_id is required"
+  def new(event_data) when not is_map_key(event_data, :device_id) do
+    raise ArgumentError, "device_id is required"
   end
 
   @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
   def validate(%__MODULE__{} = event) do
     with :ok <- validate_event_name(event.event),
-         :ok <- validate_distinct_id(event.distinct_id),
+         :ok <- validate_device_id(Map.get(event.properties, :device_id)),
+         :ok <- validate_optional_user_id(Map.get(event.properties, :user_id)),
+         :ok <- validate_optional_ip(Map.get(event.properties, :ip)),
          :ok <- Validation.validate_event_size(event),
          :ok <- Validation.validate_property_count(event.properties),
          :ok <- Validation.validate_nesting_depth(event.properties, 3) do
@@ -99,8 +108,9 @@ defmodule Mixpanel.Event do
     %{
       event: event.event,
       properties:
-        Map.merge(event.properties, %{
-          distinct_id: event.distinct_id,
+        event.properties
+        |> convert_identity_properties()
+        |> Map.merge(%{
           time: event.time,
           # Will be set by auth module
           token: nil
@@ -113,8 +123,9 @@ defmodule Mixpanel.Event do
     %{
       event: event.event,
       properties:
-        Map.merge(event.properties, %{
-          distinct_id: event.distinct_id,
+        event.properties
+        |> convert_identity_properties()
+        |> Map.merge(%{
           time: event.time,
           # Will be set by auth module
           token: nil
@@ -126,9 +137,37 @@ defmodule Mixpanel.Event do
   defp validate_event_name(name) when is_binary(name), do: :ok
   defp validate_event_name(_), do: {:error, "event name must be a string"}
 
-  defp validate_distinct_id(""), do: {:error, "distinct_id cannot be empty"}
-  defp validate_distinct_id(id) when is_binary(id), do: :ok
-  defp validate_distinct_id(_), do: {:error, "distinct_id must be a string"}
+  defp validate_device_id(nil), do: {:error, "device_id is required"}
+  defp validate_device_id(""), do: {:error, "device_id cannot be empty"}
+  defp validate_device_id(id) when is_binary(id), do: :ok
+  defp validate_device_id(_), do: {:error, "device_id must be a string"}
+
+  defp validate_optional_user_id(nil), do: :ok
+  defp validate_optional_user_id(""), do: {:error, "user_id cannot be empty when present"}
+  defp validate_optional_user_id(id) when is_binary(id), do: :ok
+  defp validate_optional_user_id(_), do: {:error, "user_id must be a string"}
+
+  defp validate_optional_ip(nil), do: :ok
+  defp validate_optional_ip(""), do: {:error, "ip cannot be empty when present"}
+  defp validate_optional_ip(ip) when is_binary(ip), do: :ok
+  defp validate_optional_ip(_), do: {:error, "ip must be a string"}
+
+  defp convert_identity_properties(properties) do
+    properties
+    |> convert_property(:device_id, "$device_id")
+    |> convert_property(:user_id, "$user_id")
+    |> convert_property(:ip, "ip")
+  end
+
+  defp convert_property(properties, from_key, to_key) do
+    case Map.get(properties, from_key) do
+      nil -> properties
+      value ->
+        properties
+        |> Map.delete(from_key)
+        |> Map.put(to_key, value)
+    end
+  end
 
   defp current_timestamp do
     System.system_time(:second)

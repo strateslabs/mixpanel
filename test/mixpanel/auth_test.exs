@@ -59,7 +59,7 @@ defmodule Mixpanel.AuthTest do
       payload = %{
         event: "test_event",
         properties: %{
-          distinct_id: "user123",
+          "$device_id": "device-uuid-123",
           custom_prop: "value"
         }
       }
@@ -67,7 +67,7 @@ defmodule Mixpanel.AuthTest do
       result = Mixpanel.Auth.add_token_to_payload(payload, "test_token")
 
       assert result.properties.token == "test_token"
-      assert result.properties.distinct_id == "user123"
+      assert result.properties."$device_id" == "device-uuid-123"
       assert result.properties.custom_prop == "value"
     end
 
@@ -75,7 +75,7 @@ defmodule Mixpanel.AuthTest do
       payload = %{
         event: "test_event",
         properties: %{
-          distinct_id: "user123",
+          "$device_id": "device-uuid-123",
           time: 1_234_567_890
         }
       }
@@ -83,7 +83,7 @@ defmodule Mixpanel.AuthTest do
       result = Mixpanel.Auth.add_token_to_payload(payload, "test_token")
 
       assert result.properties.token == "test_token"
-      assert result.properties.distinct_id == "user123"
+      assert result.properties."$device_id" == "device-uuid-123"
       assert result.properties.time == 1_234_567_890
     end
 
@@ -91,7 +91,7 @@ defmodule Mixpanel.AuthTest do
       payload = %{
         event: "test_event",
         properties: %{
-          distinct_id: "user123",
+          "$device_id": "device-uuid-123",
           token: "old_token"
         }
       }
@@ -107,14 +107,14 @@ defmodule Mixpanel.AuthTest do
       payload = %{
         event: "test_event",
         properties: %{
-          distinct_id: "user123"
+          "$device_id": "device-uuid-123"
         }
       }
 
       result = Mixpanel.Auth.add_project_id_to_payload(payload, "123456")
 
       assert result.properties.project_id == "123456"
-      assert result.properties.distinct_id == "user123"
+      assert result.properties."$device_id" == "device-uuid-123"
     end
   end
 end

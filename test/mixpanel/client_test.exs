@@ -23,7 +23,7 @@ defmodule Mixpanel.ClientTest do
       event = %{
         event: "button_clicked",
         properties: %{
-          distinct_id: "user123",
+          "$device_id": "device-uuid-123",
           button_id: "submit"
         }
       }
