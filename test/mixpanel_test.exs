@@ -4,16 +4,22 @@ defmodule MixpanelTest do
 
   setup do
     Application.put_env(:mixpanel, :project_token, "test_token")
-    Application.put_env(:mixpanel, :http_client, Mixpanel.TestHTTPClient)
+
+    # Configure Req.Test for all tests
+    test_options = [
+      plug: {Req.Test, __MODULE__},
+      retry: false
+    ]
+    Application.put_env(:mixpanel, :http_client_options, test_options)
 
     # Default stub for any unexpected calls to HTTP client (like from batcher)
-    Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+    Req.Test.stub(__MODULE__, fn conn ->
       Req.Test.json(conn, %{"status" => 1})
     end)
 
     on_exit(fn ->
       Application.delete_env(:mixpanel, :project_token)
-      Application.delete_env(:mixpanel, :http_client)
+      Application.delete_env(:mixpanel, :http_client_options)
     end)
 
     :ok
@@ -23,7 +29,7 @@ defmodule MixpanelTest do
     # Allow all processes to use the stub (needed for Batcher process)
     case Process.whereis(Mixpanel.Batcher) do
       nil -> :ignore
-      pid -> Req.Test.allow(Mixpanel.TestHTTPClient, self(), pid)
+      pid -> Req.Test.allow(__MODULE__, self(), pid)
     end
   end
 
@@ -44,7 +50,7 @@ defmodule MixpanelTest do
   describe "track/2 happy paths" do
     test "successfully validates and calls API for immediate tracking" do
       # Mock successful HTTP response
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"status" => 1})
       end)
 
@@ -76,7 +82,7 @@ defmodule MixpanelTest do
     end
 
     test "handles valid event with custom timestamp" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"status" => 1})
       end)
 
@@ -97,7 +103,7 @@ defmodule MixpanelTest do
     end
 
     test "handles event with user_id for identified user" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"status" => 1})
       end)
 
@@ -116,7 +122,7 @@ defmodule MixpanelTest do
     end
 
     test "handles event with ip for geolocation" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"status" => 1})
       end)
 
@@ -170,7 +176,7 @@ defmodule MixpanelTest do
         project_id: "123456"
       })
 
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"num_records_imported" => 2})
       end)
 
@@ -191,7 +197,7 @@ defmodule MixpanelTest do
         project_id: "123456"
       })
 
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.json(conn, %{"num_records_imported" => 1})
       end)
 
@@ -224,7 +230,7 @@ defmodule MixpanelTest do
 
   describe "API error propagation" do
     test "propagates rate limit errors from API" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         conn
         |> Plug.Conn.put_status(429)
         |> Plug.Conn.put_resp_content_type("text/plain")
@@ -239,7 +245,7 @@ defmodule MixpanelTest do
     end
 
     test "propagates validation errors from API" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         conn
         |> Plug.Conn.put_status(400)
         |> Req.Test.json(%{"error" => "Invalid data"})
@@ -253,7 +259,7 @@ defmodule MixpanelTest do
     end
 
     test "propagates network errors from client" do
-      Req.Test.stub(Mixpanel.TestHTTPClient, fn conn ->
+      Req.Test.stub(__MODULE__, fn conn ->
         Req.Test.transport_error(conn, :timeout)
       end)
 

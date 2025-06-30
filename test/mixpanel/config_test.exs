@@ -9,6 +9,17 @@ defmodule Mixpanel.ConfigTest do
     Application.delete_env(:mixpanel, :batch_timeout)
     Application.delete_env(:mixpanel, :base_url)
     Application.delete_env(:mixpanel, :http_client_options)
+
+    on_exit(fn ->
+      # Clean up after each test to prevent config leaking
+      Application.delete_env(:mixpanel, :project_token)
+      Application.delete_env(:mixpanel, :service_account)
+      Application.delete_env(:mixpanel, :batch_size)
+      Application.delete_env(:mixpanel, :batch_timeout)
+      Application.delete_env(:mixpanel, :base_url)
+      Application.delete_env(:mixpanel, :http_client_options)
+    end)
+
     :ok
   end
 

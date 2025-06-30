@@ -42,7 +42,6 @@ defmodule Mixpanel.Client do
   end
 
   defp make_request(url, payload, headers) do
-    http_client = Application.get_env(:mixpanel, :http_client, Req)
     user_options = Config.http_client_options()
 
     # Build default options that can be overridden by user config
@@ -54,12 +53,9 @@ defmodule Mixpanel.Client do
     # Merge user options, allowing them to override defaults
     final_options = Keyword.merge(default_options, user_options)
 
-    case http_client.post(url, final_options) do
+    case Req.post(url, final_options) do
       {:ok, %{status: 200, body: body}} ->
         parse_success_response(body)
-
-      {:ok, %{status: 429, body: _body}} ->
-        {:error, Error.new(:rate_limit, "Rate limited")}
 
       {:ok, %{status: 400, body: body}} ->
         message = extract_error_message(body)
@@ -67,6 +63,9 @@ defmodule Mixpanel.Client do
 
       {:ok, %{status: status, body: _body}} when status in [401, 403] ->
         {:error, Error.new(:auth, "Authentication failed")}
+
+      {:ok, %{status: 429, body: _body}} ->
+        {:error, Error.new(:rate_limit, "Rate limited")}
 
       {:ok, %{status: status, body: _body}} when status >= 500 ->
         {:error, Error.new(:server, "Server error")}

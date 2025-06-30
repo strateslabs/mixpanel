@@ -235,24 +235,22 @@ Force send all batched events immediately.
 
 ## Advanced Usage
 
-### Custom HTTP Client
+### Testing with Req.Test
 
-For testing or custom networking needs:
+For testing, use Req.Test directly through http_client_options:
 
 ```elixir
 # In test environment
 config :mixpanel,
-  http_client: MyApp.MockHTTPClient
+  http_client_options: [
+    plug: {Req.Test, MyApp.TestModule},
+    retry: false  # Disable retries for fast tests
+  ]
 
-# Your custom client must implement Mixpanel.HTTPClientBehaviour
-defmodule MyApp.MockHTTPClient do
-  @behaviour Mixpanel.HTTPClientBehaviour
-  
-  def post(url, opts) do
-    # Your implementation
-    {:ok, %{status: 200, body: %{"status" => 1}}}
-  end
-end
+# In your test
+Req.Test.stub(MyApp.TestModule, fn conn ->
+  Req.Test.json(conn, %{"status" => 1})
+end)
 ```
 
 ### Monitoring and Observability

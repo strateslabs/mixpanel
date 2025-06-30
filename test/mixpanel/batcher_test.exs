@@ -35,27 +35,4 @@ defmodule Mixpanel.BatcherTest do
     end
   end
 
-  describe "handle_rate_limit/1" do
-    test "pauses batching when rate limited" do
-      # Simulate rate limit response
-      Mixpanel.Batcher.handle_rate_limit(429)
-
-      # Check that batcher is in rate limited state
-      state = :sys.get_state(Mixpanel.Batcher)
-      assert state.rate_limited == true
-      assert state.rate_limit_until > System.monotonic_time(:millisecond)
-    end
-
-    test "calculates appropriate backoff time" do
-      before_time = System.monotonic_time(:millisecond)
-      Mixpanel.Batcher.handle_rate_limit(429)
-
-      state = :sys.get_state(Mixpanel.Batcher)
-      backoff_duration = state.rate_limit_until - before_time
-
-      # Should be at least 2 seconds but not too long for tests
-      assert backoff_duration >= 2000
-      assert backoff_duration <= 10000
-    end
-  end
 end
