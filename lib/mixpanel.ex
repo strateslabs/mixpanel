@@ -31,14 +31,14 @@ defmodule Mixpanel do
         amount: 99.99
       })
 
-      # Import historical events
-      Mixpanel.import_events([
+      # Track historical events
+      Mixpanel.track_many([
         %{event: "signup", device_id: "device-uuid-123", time: ~U[2023-01-01 00:00:00Z], source: "organic"},
         %{event: "purchase", device_id: "device-uuid-123", user_id: "user@example.com", time: ~U[2023-01-02 00:00:00Z], amount: 99.99}
       ])
 
-      # Use batching for high-throughput scenarios
-      Mixpanel.track("page_view", %{device_id: "device-uuid-123"}, batch: true)
+      # Default behavior: events are batched automatically
+      Mixpanel.track("page_view", %{device_id: "device-uuid-123"})
       Mixpanel.flush()  # Flush pending batched events
   """
 
@@ -58,7 +58,7 @@ defmodule Mixpanel do
 
   ## Options
 
-    * `:batch` - If true, add event to batch instead of sending immediately
+    * `:immediate` - If true, send event immediately instead of batching (default: false)
 
   ## Examples
 
@@ -75,15 +75,15 @@ defmodule Mixpanel do
         amount: 99.99
       })
 
-      # Add to batch
+      # Send immediately (bypass batching)
       Mixpanel.track("page_view", %{
         device_id: "device-uuid-123"
-      }, batch: true)
+      }, immediate: true)
 
   ## Returns
 
-    * `{:ok, %{accepted: 1}}` - Event tracked successfully
-    * `:ok` - Event added to batch (when `batch: true`)
+    * `:ok` - Event added to batch (default behavior)
+    * `{:ok, %{accepted: 1}}` - Event sent immediately (when `immediate: true`)
     * `{:error, reason}` - Validation or API error
   """
   @spec track(String.t(), properties(), keyword()) :: response() | :ok
@@ -98,9 +98,10 @@ defmodule Mixpanel do
   end
 
   @doc """
-  Import a batch of historical events.
+  Track multiple historical events in batch.
 
   Requires a service account to be configured for authentication.
+  This function is designed for importing historical data with specific timestamps.
 
   ## Parameters
 
@@ -124,15 +125,15 @@ defmodule Mixpanel do
         }
       ]
 
-      Mixpanel.import_events(events)
+      Mixpanel.track_many(events)
 
   ## Returns
 
-    * `{:ok, %{accepted: count}}` - Events imported successfully
+    * `{:ok, %{accepted: count}}` - Events tracked successfully
     * `{:error, reason}` - Validation, configuration, or API error
   """
-  @spec import_events([map()]) :: response()
-  def import_events(events) when is_list(events) do
+  @spec track_many([map()]) :: response()
+  def track_many(events) when is_list(events) do
     case validate_import_inputs(events) do
       :ok ->
         API.Events.import(events)
@@ -142,9 +143,20 @@ defmodule Mixpanel do
     end
   end
 
-  def import_events(_events) do
+  def track_many(_events) do
     {:error, "events must be a list"}
   end
+
+  @doc """
+  Import a batch of historical events.
+
+  **DEPRECATED**: Use `track_many/1` instead. This function will be removed in v1.0.
+
+  This function exists for backward compatibility and delegates to `track_many/1`.
+  """
+  @deprecated "Use track_many/1 instead"
+  @spec import_events([map()]) :: response()
+  def import_events(events), do: track_many(events)
 
   @doc """
   Flush all pending batched events immediately.
@@ -155,9 +167,9 @@ defmodule Mixpanel do
 
   ## Examples
 
-      # Add some events to batch
-      Mixpanel.track("event1", %{device_id: "device-uuid-123"}, batch: true)
-      Mixpanel.track("event2", %{device_id: "device-uuid-456"}, batch: true)
+      # Add some events to batch (default behavior)
+      Mixpanel.track("event1", %{device_id: "device-uuid-123"})
+      Mixpanel.track("event2", %{device_id: "device-uuid-456"})
 
       # Force send now
       Mixpanel.flush()

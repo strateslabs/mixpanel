@@ -10,7 +10,7 @@ A robust, production-ready Elixir client for the [Mixpanel](https://mixpanel.com
 ## Features
 
 - 🚀 **High Performance** - Automatic batching for high-throughput event tracking
-- 🛡️ **Reliable** - Robust error handling and rate limit management
+- 🛡️ **Reliable** - Built-in retry logic, error handling and rate limit management
 - 📊 **Complete API Coverage** - Track events and import historical data
 - 🔧 **Configurable** - Flexible configuration options for all environments
 - ✅ **Well Tested** - Comprehensive test suite
@@ -76,20 +76,18 @@ config :mixpanel,
 ### 3. High-Throughput Batching
 
 ```elixir
-# By default, events are sent immediately
-{:ok, result} = Mixpanel.track("purchase", %{device_id: "user1"})
+# By default, events are batched automatically (recommended)
+Mixpanel.track("click", %{device_id: "user1"})
+Mixpanel.track("click", %{device_id: "user2"}) 
+Mixpanel.track("click", %{device_id: "user3"})
 
-# For high-volume scenarios, use batching (more efficient)
-Mixpanel.track("click", %{device_id: "user1"}, batch: true)
-Mixpanel.track("click", %{device_id: "user2"}, batch: true)
-Mixpanel.track("click", %{device_id: "user3"}, batch: true)
+# For cases where you need immediate sending, use immediate: true
+{:ok, result} = Mixpanel.track("critical_event", %{device_id: "user1"}, immediate: true)
 
 # Events are automatically sent when batch is full or timeout is reached
 # Or manually flush when needed
 Mixpanel.flush()
 ```
-
-**Note**: The current default is immediate sending. For most production applications, you might want batching as the default behavior.
 
 ## Usage Examples
 
@@ -135,14 +133,23 @@ events = [
   }
 ]
 
-{:ok, result} = Mixpanel.import_events(events)
+{:ok, result} = Mixpanel.track_many(events)
 # => {:ok, %{"accepted" => 2}}
 ```
 
 ### Error Handling
 
 ```elixir
+# Default behavior (batched) - returns :ok if queued successfully
 case Mixpanel.track("purchase", %{device_id: "user123", amount: 99.99}) do
+  :ok ->
+    Logger.info("Event queued for batch processing")
+  {:error, reason} ->
+    Logger.error("Failed to queue event: #{reason}")
+end
+
+# Immediate sending - returns result from API
+case Mixpanel.track("critical_event", %{device_id: "user123"}, immediate: true) do
   {:ok, result} ->
     Logger.info("Event tracked successfully: #{inspect(result)}")
   {:error, reason} ->
@@ -198,18 +205,16 @@ Track a single event immediately or add to batch.
 **Parameters:**
 - `event_name` (String) - Name of the event
 - `properties` (Map) - Event properties (must include `:device_id`)  
-- `opts` (Keyword) - Options (`:batch` for batching)
+- `opts` (Keyword) - Options (`:immediate` for immediate sending)
 
 **Returns:**
-- `{:ok, result}` - Success (immediate tracking)
-- `:ok` - Added to batch  
+- `:ok` - Added to batch (default behavior)
+- `{:ok, result}` - Success (when `immediate: true`)
 - `{:error, reason}` - Validation or API error
 
-### `Mixpanel.import_events/1`
+### `Mixpanel.track_many/1`
 
-Import historical events in batch. Requires service account configuration.
-
-**Note**: This function uses Elixir's reserved `import` keyword internally, which may be renamed in future versions to `bulk_track` or similar.
+Track multiple historical events with timestamps in batch. Requires service account configuration.
 
 **Parameters:**
 - `events` (List) - List of event maps with `:event`, `:device_id`, `:time`
@@ -217,6 +222,10 @@ Import historical events in batch. Requires service account configuration.
 **Returns:**
 - `{:ok, %{"accepted" => count}}` - Success
 - `{:error, reason}` - Error
+
+### `Mixpanel.import_events/1` (DEPRECATED)
+
+**DEPRECATED**: Use `track_many/1` instead. This function will be removed in v1.0.
 
 ### `Mixpanel.flush/0`
 
@@ -246,9 +255,37 @@ defmodule MyApp.MockHTTPClient do
 end
 ```
 
-### Logging and Debugging
+### Monitoring and Observability
 
-The library includes built-in logging for debugging:
+The library includes comprehensive telemetry events for monitoring:
+
+```elixir
+# Add telemetry for monitoring
+:telemetry.attach("mixpanel-events", [:mixpanel, :track, :success], fn _event, measurements, metadata, _config ->
+  Logger.info("Mixpanel event tracked", 
+    duration: measurements.duration, 
+    event_name: metadata.event_name,
+    immediate: metadata.immediate
+  )
+end)
+
+# Available telemetry events:
+# [:mixpanel, :track, :success] - Single event tracked successfully
+# [:mixpanel, :track, :error] - Single event tracking failed
+# [:mixpanel, :track, :validation_error] - Event validation failed
+# [:mixpanel, :track, :batch_queued] - Event added to batch
+# [:mixpanel, :track_batch, :success] - Batch sent successfully  
+# [:mixpanel, :track_batch, :error] - Batch sending failed
+# [:mixpanel, :import, :success] - Historical events imported
+# [:mixpanel, :import, :error] - Import failed
+# [:mixpanel, :batch, :full] - Batch reached size limit
+# [:mixpanel, :batch, :queued] - Events queued in batch
+# [:mixpanel, :batch, :sent] - Batch sent to API
+# [:mixpanel, :batch, :failed] - Batch sending failed
+# [:mixpanel, :batch, :rate_limited] - Rate limit encountered
+```
+
+Debug logging is also available:
 
 ```elixir
 # Enable debug logging to see batch operations
@@ -294,7 +331,7 @@ defmodule MyAppWeb.PageLive do
       user_id: socket.assigns.current_user.id,
       button_id: button_id,
       page: "home"
-    }, batch: true)
+    })
     
     {:noreply, socket}
   end
@@ -306,9 +343,9 @@ end
 The library automatically handles background processing with a built-in batcher:
 
 ```elixir
-# Events are processed asynchronously when using batch: true
-Mixpanel.track("user_action", %{device_id: "123"}, batch: true)
-Mixpanel.track("another_action", %{device_id: "456"}, batch: true)
+# Events are batched by default and processed asynchronously
+Mixpanel.track("user_action", %{device_id: "123"})
+Mixpanel.track("another_action", %{device_id: "456"})
 
 # The built-in GenServer automatically sends batches when:
 # - Batch size limit is reached (default: 1000 events)

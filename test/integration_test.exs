@@ -70,7 +70,7 @@ defmodule Mixpanel.IntegrationTest do
           device_id: "device-uuid-123",
           amount: 99.99,
           currency: "USD"
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -90,12 +90,12 @@ defmodule Mixpanel.IntegrationTest do
           device_id: "device-uuid-123",
           time: custom_time,
           source: "organic"
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
 
-    test "successfully adds event to batch when batch: true" do
+    test "successfully adds event to batch by default" do
       # Clear any existing events
       Mixpanel.flush()
       Process.sleep(10)
@@ -107,8 +107,7 @@ defmodule Mixpanel.IntegrationTest do
           %{
             device_id: "device-uuid-123",
             page: "home"
-          },
-          batch: true
+          }
         )
 
       assert :ok = result
@@ -208,11 +207,12 @@ defmodule Mixpanel.IntegrationTest do
 
   describe "error handling integration" do
     test "handles rate limit errors gracefully" do
+      # Mock single call - Req handles retries internally
       expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
         {:ok, %{status: 429, body: "Rate limited"}}
       end)
 
-      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :rate_limit
@@ -225,7 +225,7 @@ defmodule Mixpanel.IntegrationTest do
         {:ok, %{status: 400, body: %{"error" => "Invalid event data"}}}
       end)
 
-      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :validation
@@ -234,11 +234,12 @@ defmodule Mixpanel.IntegrationTest do
     end
 
     test "handles network errors gracefully" do
+      # Mock single call - Req handles retries internally
       expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
         {:error, %{reason: :timeout}}
       end)
 
-      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :network
@@ -257,7 +258,7 @@ defmodule Mixpanel.IntegrationTest do
         {:ok, %{status: 200, body: %{"status" => 1}}}
       end)
 
-      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test_event", %{device_id: "device-uuid-123"}, immediate: true)
       assert {:ok, %{accepted: 1}} = result
     end
 

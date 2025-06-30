@@ -41,35 +41,19 @@ defmodule Mixpanel.Client do
     make_request(url, events_with_auth, headers)
   end
 
-  @spec retry_with_backoff(function(), pos_integer(), pos_integer()) :: response()
-  def retry_with_backoff(request_fn, max_retries, current_attempt \\ 1) do
-    case request_fn.() do
-      {:ok, result} ->
-        {:ok, result}
-
-      {:error, %Error{retryable?: true}} when current_attempt < max_retries ->
-        backoff = calculate_backoff(current_attempt)
-        Process.sleep(backoff)
-        retry_with_backoff(request_fn, max_retries, current_attempt + 1)
-
-      error ->
-        error
-    end
-  end
-
-  @spec calculate_backoff(pos_integer()) :: pos_integer()
-  def calculate_backoff(attempt) do
-    # Exponential backoff in ms
-    base_delay = :math.pow(2, attempt) * 1000
-    # Add up to 1 second of jitter
-    jitter = :rand.uniform(1000)
-    trunc(base_delay + jitter)
-  end
 
   defp make_request(url, payload, headers) do
     http_client = Application.get_env(:mixpanel, :http_client, Req)
+    max_retries = Config.max_retries()
 
-    case http_client.post(url, json: payload, headers: headers) do
+    # Use Req's built-in retry for transient errors (429, 5xx, network issues)
+    case http_client.post(url, 
+      json: payload, 
+      headers: headers,
+      retry: :transient,
+      max_retries: max_retries,
+      retry_log_level: :debug
+    ) do
       {:ok, %{status: 200, body: body}} ->
         parse_success_response(body)
 

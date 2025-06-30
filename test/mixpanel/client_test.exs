@@ -148,15 +148,4 @@ defmodule Mixpanel.ClientTest do
     end
   end
 
-  describe "calculate_backoff/1" do
-    test "calculates exponential backoff with jitter" do
-      backoff1 = Mixpanel.Client.calculate_backoff(1)
-      backoff2 = Mixpanel.Client.calculate_backoff(2)
-
-      assert is_integer(backoff1)
-      assert is_integer(backoff2)
-      assert backoff1 > 0
-      assert backoff2 > 0
-    end
-  end
 end

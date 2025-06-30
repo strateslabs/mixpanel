@@ -52,7 +52,7 @@ defmodule MixpanelTest do
         Mixpanel.track("purchase", %{
           device_id: "device-uuid-123",
           amount: 99.99
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -65,8 +65,7 @@ defmodule MixpanelTest do
           %{
             device_id: "device-uuid-123",
             page: "home"
-          },
-          batch: true
+          }
         )
 
       assert :ok = result
@@ -84,7 +83,7 @@ defmodule MixpanelTest do
           device_id: "device-uuid-123",
           time: custom_time,
           source: "organic"
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -99,7 +98,7 @@ defmodule MixpanelTest do
           device_id: "device-uuid-123",
           user_id: "user@example.com",
           method: "password"
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -115,7 +114,7 @@ defmodule MixpanelTest do
           user_id: "user@example.com", 
           ip: "192.168.1.1",
           page: "home"
-        })
+        }, immediate: true)
 
       assert {:ok, %{accepted: 1}} = result
     end
@@ -206,11 +205,12 @@ defmodule MixpanelTest do
 
   describe "API error propagation" do
     test "propagates rate limit errors from API" do
+      # Mock single call - Req handles retries internally
       expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
         {:ok, %{status: 429, body: "Rate limited"}}
       end)
 
-      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :rate_limit
@@ -222,7 +222,7 @@ defmodule MixpanelTest do
         {:ok, %{status: 400, body: %{"error" => "Invalid data"}}}
       end)
 
-      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :validation
@@ -230,11 +230,12 @@ defmodule MixpanelTest do
     end
 
     test "propagates network errors from client" do
+      # Mock single call - Req handles retries internally  
       expect(Mixpanel.HTTPClientMock, :post, fn _url, _opts ->
         {:error, %{reason: :timeout}}
       end)
 
-      result = Mixpanel.track("test", %{device_id: "device-uuid-123"})
+      result = Mixpanel.track("test", %{device_id: "device-uuid-123"}, immediate: true)
 
       assert {:error, error} = result
       assert error.type == :network

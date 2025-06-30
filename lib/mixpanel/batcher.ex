@@ -66,9 +66,11 @@ defmodule Mixpanel.Batcher do
 
       if should_send_batch?(new_events) do
         send_batch_async(new_events)
+        :telemetry.execute([:mixpanel, :batch, :full], %{event_count: length(new_events)}, %{})
         state = reset_batch_state(state)
         {:noreply, state}
       else
+        :telemetry.execute([:mixpanel, :batch, :queued], %{event_count: length(new_events)}, %{})
         state = ensure_timer_running(state)
         {:noreply, state}
       end
@@ -116,14 +118,17 @@ defmodule Mixpanel.Batcher do
   @impl GenServer
   def handle_info({:batch_result, result}, state) do
     case result do
-      {:ok, _response} ->
+      {:ok, response} ->
         Logger.debug("Batch sent successfully")
+        :telemetry.execute([:mixpanel, :batch, :sent], %{}, %{response: response})
 
       {:error, %{type: :rate_limit}} ->
         handle_rate_limit(429)
+        :telemetry.execute([:mixpanel, :batch, :rate_limited], %{}, %{})
 
       {:error, error} ->
         Logger.error("Batch send failed: #{inspect(error)}")
+        :telemetry.execute([:mixpanel, :batch, :failed], %{}, %{error: error})
     end
 
     {:noreply, state}
