@@ -1,5 +1,5 @@
 defmodule Mixpanel.BatcherTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   setup do
     Application.put_env(:mixpanel, :project_token, "test_token")
@@ -34,5 +34,4 @@ defmodule Mixpanel.BatcherTest do
       assert :ok = Mixpanel.Batcher.flush()
     end
   end
-
 end

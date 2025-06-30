@@ -1,5 +1,5 @@
 defmodule MixpanelTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
   doctest Mixpanel
 
   setup do
@@ -10,6 +10,7 @@ defmodule MixpanelTest do
       plug: {Req.Test, __MODULE__},
       retry: false
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     # Default stub for any unexpected calls to HTTP client (like from batcher)

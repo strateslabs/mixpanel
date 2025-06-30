@@ -1,5 +1,5 @@
 defmodule Mixpanel.API.EventsTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   setup do
     Application.put_env(:mixpanel, :project_token, "test_token")

@@ -1,5 +1,5 @@
 defmodule Mixpanel.ConfigTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   setup do
     # Clear any existing config

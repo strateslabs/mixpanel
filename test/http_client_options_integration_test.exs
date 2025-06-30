@@ -1,5 +1,5 @@
 defmodule HTTPClientOptionsIntegrationTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   setup do
     Application.put_env(:mixpanel, :project_token, "test_token")
@@ -18,6 +18,7 @@ defmodule HTTPClientOptionsIntegrationTest do
       plug: {Req.Test, __MODULE__},
       retry: false
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     # Stub to return rate limit error
@@ -39,8 +40,10 @@ defmodule HTTPClientOptionsIntegrationTest do
     test_options = [
       plug: {Req.Test, __MODULE__},
       receive_timeout: 30_000,
-      retry: false  # Disable retries for fast test
+      # Disable retries for fast test
+      retry: false
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     Req.Test.stub(__MODULE__, fn conn ->
@@ -56,10 +59,14 @@ defmodule HTTPClientOptionsIntegrationTest do
     # Configure custom retry settings with Req.Test
     test_options = [
       plug: {Req.Test, __MODULE__},
-      retry: :safe_transient,  # Different retry strategy
-      max_retries: 1,          # Fewer retries
-      retry_log_level: :info   # Different log level
+      # Different retry strategy
+      retry: :safe_transient,
+      # Fewer retries
+      max_retries: 1,
+      # Different log level
+      retry_log_level: :info
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     Req.Test.stub(__MODULE__, fn conn ->
@@ -70,14 +77,16 @@ defmodule HTTPClientOptionsIntegrationTest do
 
     assert {:ok, %{accepted: 1}} = result
   end
-  
+
   test "users can add additional Req options like error handling" do
     # Configure with additional options and Req.Test
     test_options = [
       plug: {Req.Test, __MODULE__},
       retry: false,
-      decode_body: false  # Valid Req option
+      # Valid Req option
+      decode_body: false
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     Req.Test.stub(__MODULE__, fn conn ->

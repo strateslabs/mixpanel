@@ -1,5 +1,5 @@
 defmodule Mixpanel.Utils.ValidationTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   describe "validate_event_size/1" do
     test "accepts event under size limit" do

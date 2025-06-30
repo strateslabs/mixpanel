@@ -1,5 +1,5 @@
 defmodule Mixpanel.EventTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   describe "new/2 for track events" do
     test "creates valid track event with required fields" do

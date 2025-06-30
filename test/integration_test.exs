@@ -1,5 +1,5 @@
 defmodule Mixpanel.IntegrationTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   setup do
     # Configure for testing
@@ -20,6 +20,7 @@ defmodule Mixpanel.IntegrationTest do
       plug: {Req.Test, __MODULE__},
       retry: false
     ]
+
     Application.put_env(:mixpanel, :http_client_options, test_options)
 
     # Global stub for batch operations
@@ -292,7 +293,7 @@ defmodule Mixpanel.IntegrationTest do
       Mixpanel.track("event1", %{device_id: "device-uuid-123"}, batch: true)
       Mixpanel.track("event2", %{device_id: "device-uuid-456"}, batch: true)
 
-      # Give time for async batch processing  
+      # Give time for async batch processing
       Process.sleep(100)
 
       # Verify batch was automatically sent and cleared

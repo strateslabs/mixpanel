@@ -1,5 +1,5 @@
 defmodule Mixpanel.AuthTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   describe "track_headers/1" do
     test "returns headers with project token for track endpoint" do
