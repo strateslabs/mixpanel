@@ -4,7 +4,7 @@ defmodule MixpanelTest do
   import Mock
 
   defp mock do
-    [get: fn _, _, _ -> {:ok, %HTTPoison.Response{status_code: 200, body: "1"}} end]
+    [get: fn _, _ -> {:ok, %Req.Response{status: 200, body: "1"}} end]
   end
 
   setup do
@@ -13,17 +13,16 @@ defmodule MixpanelTest do
     {:ok, pid: pid}
   end
 
-  test_with_mock "track an event", %{pid: pid}, HTTPoison, [], mock() do
+  test_with_mock "track an event", %{pid: pid}, Req, [], mock() do
     Mixpanel.track("Signed up", %{"Referred By" => "friend"}, distinct_id: "13793")
 
     :timer.sleep(50)
 
     assert :meck.called(
-             HTTPoison,
+             Req,
              :get,
              [
                "https://api.mixpanel.com/track",
-               [],
                [
                  params: [
                    data:
@@ -45,11 +44,10 @@ defmodule MixpanelTest do
     :timer.sleep(50)
 
     assert :meck.called(
-             HTTPoison,
+             Req,
              :get,
              [
                "https://api.mixpanel.com/track",
-               [],
                [
                  params: [
                    data:
@@ -61,7 +59,7 @@ defmodule MixpanelTest do
            )
   end
 
-  test_with_mock "track a profile update", %{pid: pid}, HTTPoison, [], mock() do
+  test_with_mock "track a profile update", %{pid: pid}, Req, [], mock() do
     Mixpanel.engage(
       "13793",
       "$set",
@@ -72,11 +70,10 @@ defmodule MixpanelTest do
     :timer.sleep(50)
 
     assert :meck.called(
-             HTTPoison,
+             Req,
              :get,
              [
                "https://api.mixpanel.com/engage",
-               [],
                [
                  params: [
                    data:
@@ -97,11 +94,10 @@ defmodule MixpanelTest do
     :timer.sleep(50)
 
     assert :meck.called(
-             HTTPoison,
+             Req,
              :get,
              [
                "https://api.mixpanel.com/engage",
-               [],
                [
                  params: [
                    data:

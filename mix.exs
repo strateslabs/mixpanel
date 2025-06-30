@@ -20,7 +20,7 @@ defmodule Mixpanel.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :httpoison, :poison],
+      extra_applications: [:logger],
       mod: {Mixpanel.Application, []}
     ]
   end
@@ -30,10 +30,9 @@ defmodule Mixpanel.MixProject do
     [
       {:credo, "~> 1.7.0", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:httpoison, "~> 2.1"},
       {:jason, "~> 1.4"},
+      {:req, "~> 0.5.0"},
       {:mock, "~> 0.3.1", only: :test},
-      {:poison, "~> 5.0"},
       {:styler, "~> 1.1", only: [:dev, :test]}
     ]
   end

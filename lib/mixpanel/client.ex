@@ -44,16 +44,21 @@ defmodule Mixpanel.Client do
 
     data =
       %{event: event, properties: Map.put(properties, :token, token)}
-      |> Poison.encode!()
+      |> Jason.encode!()
       |> :base64.encode()
 
-    case HTTPoison.get(@track_endpoint, [], params: [data: data]) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: "1"}} ->
+    case Req.get(@track_endpoint, params: [data: data]) do
+      {:ok, %Req.Response{status: 200, body: "1"}} ->
         :ok
 
-      other ->
+      {:ok, response} ->
         Logger.warning(
-          "Problem tracking Mixpanel event: #{inspect(event)}, #{inspect(properties)} Got: #{inspect(other)}"
+          "Problem tracking Mixpanel event: #{inspect(event)}, #{inspect(properties)} Got: #{inspect(response)}"
+        )
+
+      {:error, error} ->
+        Logger.warning(
+          "Problem tracking Mixpanel event: #{inspect(event)}, #{inspect(properties)} Error: #{inspect(error)}"
         )
     end
 
@@ -67,16 +72,21 @@ defmodule Mixpanel.Client do
     data =
       event
       |> Map.put(:"$token", token)
-      |> Poison.encode!()
+      |> Jason.encode!()
       |> :base64.encode()
 
-    case HTTPoison.get(@engage_endpoint, [], params: [data: data]) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: "1"}} ->
+    case Req.get(@engage_endpoint, params: [data: data]) do
+      {:ok, %Req.Response{status: 200, body: "1"}} ->
         :ok
 
-      other ->
+      {:ok, response} ->
         Logger.warning(
-          "Problem tracking Mixpanel profile update: #{inspect(event)} Got: #{inspect(other)}"
+          "Problem tracking Mixpanel profile update: #{inspect(event)} Got: #{inspect(response)}"
+        )
+
+      {:error, error} ->
+        Logger.warning(
+          "Problem tracking Mixpanel profile update: #{inspect(event)} Error: #{inspect(error)}"
         )
     end
 
